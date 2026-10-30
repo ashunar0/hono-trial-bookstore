@@ -20,3 +20,6 @@ export const deleteCartItem = (db: Db, customerId: UserId, bookId: string) =>
     .delete(cartItemsTable)
     .where(and(eq(cartItemsTable.customerId, customerId), eq(cartItemsTable.bookId, bookId)))
     .returning();
+
+export const deleteCartOf = (db: Db, customerId: UserId) =>
+  db.delete(cartItemsTable).where(eq(cartItemsTable.customerId, customerId));

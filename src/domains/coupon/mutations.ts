@@ -1,6 +1,6 @@
 import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "#/db/index";
-import { couponsTable } from "#/db/schema";
+import { couponsTable, couponUsesTable } from "#/db/schema";
 
 export const insertCoupon = (db: Db, row: typeof couponsTable.$inferInsert) =>
   db.insert(couponsTable).values(row);
@@ -12,3 +12,6 @@ export const markStopped = (db: Db, id: string, at: Date) =>
     .set({ stoppedAt: at })
     .where(and(eq(couponsTable.id, id), isNull(couponsTable.stoppedAt)))
     .returning();
+
+export const insertCouponUse = (db: Db, row: typeof couponUsesTable.$inferInsert) =>
+  db.insert(couponUsesTable).values(row);

@@ -86,3 +86,10 @@ export const discountOf = (
     coupon.kind === "fixed" ? coupon.value : Math.floor((subtotal * coupon.value) / 100);
   return { discount };
 };
+
+/** One coupon once per customer: a use that was not given back (by a cancel) counts */
+export const CouponAlreadyUsed = {
+  code: "COUPON_ALREADY_USED",
+  kind: "conflict",
+  message: "You have already used this coupon",
+} as const;

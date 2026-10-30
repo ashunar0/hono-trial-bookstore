@@ -3,8 +3,17 @@
  * Split into files when it grows, and point drizzle.config.ts's schema at them
  */
 import { sql } from "drizzle-orm";
-import { check, index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import {
+  check,
+  index,
+  integer,
+  primaryKey,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { couponKinds } from "#/domains/coupon/rules";
+import { orderStatuses } from "#/domains/order/rules";
 
 export * from "./auth-schema";
 
@@ -47,6 +56,31 @@ export const stocksTable = sqliteTable(
   (t) => [check("stocks_quantity_not_negative", sql`${t.quantity} >= 0`)],
 );
 
+/** Stock held for someone (an order), by an id the caller made. released once given back; never twice */
+export const reservationsTable = sqliteTable("reservations", {
+  id: text("id").primaryKey(),
+  status: text("status", { enum: ["reserved", "released"] }).notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  releasedAt: integer("released_at", { mode: "timestamp_ms" }),
+});
+
+export const reservationLinesTable = sqliteTable(
+  "reservation_lines",
+  {
+    reservationId: text("reservation_id")
+      .notNull()
+      .references(() => reservationsTable.id),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => booksTable.id),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.reservationId, t.bookId] }),
+    check("reservation_lines_quantity_positive", sql`${t.quantity} > 0`),
+  ],
+);
+
 // ── coupon ──
 
 export const couponsTable = sqliteTable(
@@ -76,6 +110,27 @@ export const couponsTable = sqliteTable(
   ],
 );
 
+/** A use of a coupon, by an id the caller made. released when an order is cancelled; a return keeps it */
+export const couponUsesTable = sqliteTable(
+  "coupon_uses",
+  {
+    id: text("id").primaryKey(),
+    couponId: text("coupon_id")
+      .notNull()
+      .references(() => couponsTable.id),
+    customerId: text("customer_id").notNull(),
+    status: text("status", { enum: ["used", "released"] }).notNull(),
+    usedAt: integer("used_at", { mode: "timestamp_ms" }).notNull(),
+    releasedAt: integer("released_at", { mode: "timestamp_ms" }),
+  },
+  // One coupon once per customer, counting only the uses not given back
+  (t) => [
+    uniqueIndex("coupon_uses_once")
+      .on(t.couponId, t.customerId)
+      .where(sql`status = 'used'`),
+  ],
+);
+
 // ── cart ──
 
 /** One line per book. How many is set, not added to (PUT /cart/items/:bookId) */
@@ -93,5 +148,68 @@ export const cartItemsTable = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.customerId, t.bookId] }),
     check("cart_items_quantity_positive", sql`${t.quantity} > 0`),
+  ],
+);
+
+// ── order ──
+
+export const ordersTable = sqliteTable(
+  "orders",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull(),
+    status: text("status", { enum: orderStatuses }).notNull(),
+    /** Yen, tax included. subtotal − discount + shippingFee = total */
+    subtotal: integer("subtotal").notNull(),
+    discount: integer("discount").notNull(),
+    shippingFee: integer("shipping_fee").notNull(),
+    total: integer("total").notNull(),
+    /** The tax within total */
+    tax: integer("tax").notNull(),
+    couponId: text("coupon_id"),
+    /** As it was when placed */
+    couponCode: text("coupon_code"),
+    /** Made here before the stock is held, so a cancel can give it back whenever the placing stopped */
+    reservationId: text("reservation_id").notNull(),
+    /** The same, for the coupon. Null when no coupon */
+    couponUseId: text("coupon_use_id"),
+    paymentDueAt: integer("payment_due_at", { mode: "timestamp_ms" }).notNull(),
+    paidAt: integer("paid_at", { mode: "timestamp_ms" }),
+    shippedAt: integer("shipped_at", { mode: "timestamp_ms" }),
+    cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
+    /** When a cancel finished giving back the stock and the coupon. Null on a cancelled order: the cron finishes it */
+    releasedAt: integer("released_at", { mode: "timestamp_ms" }),
+    version: integer("version").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    check("orders_total", sql`${t.total} = ${t.subtotal} - ${t.discount} + ${t.shippingFee}`),
+    // A customer's list and the staff's list, newest first
+    index("orders_customer_created_at").on(t.customerId, t.createdAt, t.id),
+    index("orders_created_at").on(t.createdAt, t.id),
+  ],
+);
+
+/** The books of an order, with the title and price copied as they were when placed */
+export const orderLinesTable = sqliteTable(
+  "order_lines",
+  {
+    id: text("id").primaryKey(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    bookId: text("book_id").notNull(),
+    title: text("title").notNull(),
+    unitPrice: integer("unit_price").notNull(),
+    quantity: integer("quantity").notNull(),
+    /** This line's share of the order's discount */
+    discount: integer("discount").notNull(),
+    /** The order of the lines as they were in the cart */
+    position: integer("position").notNull(),
+  },
+  (t) => [
+    check("order_lines_quantity_positive", sql`${t.quantity} > 0`),
+    index("order_lines_order").on(t.orderId, t.position),
   ],
 );
