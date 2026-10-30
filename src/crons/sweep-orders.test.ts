@@ -162,6 +162,6 @@ it("one order that fails does not stop the others, and the run still fails so it
     cron.run({ deps: { ...real, db }, now: new Date("2026-11-18T10:15:00+09:00") }),
   ).rejects.toThrow("boom");
 
-  const statuses = [(await statusOf(one.id))?.status, (await statusOf(two.id))?.status].sort();
-  expect(statuses).toEqual(["awaiting_payment", "cancelled"]);
+  const statuses = [(await statusOf(one.id))?.status, (await statusOf(two.id))?.status];
+  expect(new Set(statuses)).toEqual(new Set(["awaiting_payment", "cancelled"]));
 });

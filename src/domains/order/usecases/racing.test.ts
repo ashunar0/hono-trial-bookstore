@@ -29,7 +29,7 @@ it("two cancels of one paid order at once: one wins, and the money goes back onc
     cancelOrder(makeDeps(env), { ...at, by: "staff" }),
   ]);
 
-  expect(results.map((r) => r.ok).sort()).toEqual([false, true]);
+  expect(results.filter((r) => r.ok)).toHaveLength(1);
   expect(await refundsOf(order.id)).toHaveLength(1);
 });
 
@@ -52,7 +52,7 @@ it("two receives of one return at once: one wins, the other is a 409, and the mo
     receiveReturn(makeDeps(env), { returnId: asked.id, by: "staff", now: inNovember }),
   ]);
 
-  expect(results.map((r) => r.ok).sort()).toEqual([false, true]);
+  expect(results.filter((r) => r.ok)).toHaveLength(1);
   expect(await refundsOf(order.id)).toHaveLength(1);
 });
 
