@@ -24,3 +24,20 @@ export const booksTable = sqliteTable(
     index("books_created_at").on(t.createdAt, t.id),
   ],
 );
+
+/**
+ * Stock per book. A book with no row has none (0, version 0): the row is made the first time staff set the stock
+ */
+export const stocksTable = sqliteTable(
+  "stocks",
+  {
+    bookId: text("book_id")
+      .primaryKey()
+      .references(() => booksTable.id),
+    quantity: integer("quantity").notNull(),
+    /** Counted up on every change, orders' too, so staff setting it from an old copy are turned away (STOCK_CHANGED) */
+    version: integer("version").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [check("stocks_quantity_not_negative", sql`${t.quantity} >= 0`)],
+);

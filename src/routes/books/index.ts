@@ -7,10 +7,11 @@ import {
 } from "hono-kit";
 import { requireRole } from "#/auth";
 import { listBooks, registerBook } from "#/domains/book/index";
+import { noStock, stocksOf } from "#/domains/inventory/index";
 import { bookResponse, bookResponseSchema } from "./_response";
 import { bookInputSchema } from "./_schema";
 
-/** Newest first */
+/** Newest first, with each book's stock */
 export const GET = createEndpoint(
   {
     auth: allowAnonymous,
@@ -18,12 +19,20 @@ export const GET = createEndpoint(
     responses: { 200: pageResponseSchema(bookResponseSchema) },
   },
   async (c, reply) => {
-    const page = await listBooks(c.var.deps.db, c.req.valid("query"));
+    const { db } = c.var.deps;
+    const page = await listBooks(db, c.req.valid("query"));
+    const stocks = await stocksOf(
+      db,
+      page.items.map((book) => book.id),
+    );
 
-    return reply.success(pageResponse(page, bookResponse));
+    return reply.success(
+      pageResponse(page, (book) => bookResponse(book, stocks.get(book.id) ?? noStock)),
+    );
   },
 );
 
+/** A new book has no stock until staff set it */
 export const POST = createEndpoint(
   {
     auth: requireRole("staff"),
@@ -36,6 +45,6 @@ export const POST = createEndpoint(
       now: c.get("now"),
     });
 
-    return reply.success(bookResponse(result.value));
+    return reply.success(bookResponse(result.value, noStock));
   },
 );
