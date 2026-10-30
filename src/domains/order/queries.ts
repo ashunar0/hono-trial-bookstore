@@ -70,7 +70,7 @@ export const ordersToSweep = async (db: Db, now: Date, limit: number) => {
     db
       .select(pick)
       .from(ordersTable)
-      .where(and(eq(ordersTable.status, "awaiting_payment"), lte(ordersTable.paymentDueAt, now)))
+      .where(and(eq(ordersTable.status, "awaiting_payment"), lt(ordersTable.paymentDueAt, now)))
       .orderBy(asc(ordersTable.paymentDueAt))
       .limit(limit),
     db
