@@ -50,13 +50,12 @@ export const cancelOrder = async (deps: DepsVariables["deps"], input: Input) => 
           createdAt: input.now,
         })
       : undefined;
-  const [rows] =
+  const [[cancelled]] =
     refund === undefined ? await db.batch([switched]) : await db.batch([switched, refund]);
-  // Inside a batch the rows of updateWithVersion lose their type: only whether it won is read
-  if (rows.length === 0) return conflictNow(db, order.id);
+  if (cancelled === undefined) return conflictNow(db, order.id);
 
   // 2, 3
-  await giveBack(deps, order, input.now);
+  await giveBack(deps, cancelled, input.now);
 
   return ok((await findOrder(db, order.id)) ?? order);
 };
