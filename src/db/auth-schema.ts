@@ -4,6 +4,9 @@
  */
 import { index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 
+/** A customer signs up; a staff member is a customer whose role was changed to "staff" in the database */
+export const roles = ["customer", "staff"] as const;
+
 export const user = sqliteTable("user", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
@@ -12,6 +15,8 @@ export const user = sqliteTable("user", {
   image: text("image"),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
   updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  // Added through additionalFields in src/auth.ts
+  role: text("role", { enum: roles }).default("customer").notNull(),
 });
 
 export const session = sqliteTable(

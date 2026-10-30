@@ -8,6 +8,13 @@
       "when": 1793355972101,
       "tag": "0000_slippery_deathstrike",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1793356198479,
+      "tag": "0001_heavy_loners",
+      "breakpoints": true
     }
   ]
 }

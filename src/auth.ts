@@ -5,7 +5,7 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { wireDb } from "./db/index";
-import { account, session, user, verification } from "./db/auth-schema";
+import { account, roles, session, user, verification } from "./db/auth-schema";
 
 export const makeAuth = (env: Env) =>
   betterAuth({
@@ -15,6 +15,10 @@ export const makeAuth = (env: Env) =>
     }),
     secret: env.BETTER_AUTH_SECRET,
     baseURL: env.BETTER_AUTH_URL,
+    // input: false, so a role sent on sign-up is ignored and everyone starts as a customer
+    user: {
+      additionalFields: { role: { type: [...roles], defaultValue: "customer", input: false } },
+    },
     // Customers sign up themselves, so sign-up stays open
     emailAndPassword: { enabled: true },
   });
