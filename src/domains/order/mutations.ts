@@ -51,13 +51,6 @@ export const insertReturn = (
   lines: (typeof returnLinesTable.$inferInsert)[],
 ) => [db.insert(returnsTable).values(row), db.insert(returnLinesTable).values(lines)] as const;
 
-/** A return whose request lost to another, as if it had never been. Run in one batch */
-export const deleteReturn = (db: Db, id: string) =>
-  [
-    db.delete(returnLinesTable).where(eq(returnLinesTable.returnId, id)),
-    db.delete(returnsTable).where(eq(returnsTable.id, id)),
-  ] as const;
-
 /** No row back when the version is no longer the one read */
 export const updateReturn = (
   db: Db,
