@@ -108,8 +108,9 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
     { status: "awaiting_payment", updatedAt: now },
   );
   if (placed === undefined) {
-    // The cron cancelled it first. It may have given back before this held or used anything: give back again
-    await giveBack(deps, order, now);
+    // The cron cancelled it first. It may have given back before this held or used anything: give back again.
+    // A placing order was never paid, so there is no money to give back
+    await giveBack(deps, { ...order, paidAt: null }, now);
     const current = await findOrder(db, order.id);
     return err({
       code: OrderStatusConflict.code,
