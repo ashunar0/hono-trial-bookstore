@@ -1,56 +1,6 @@
-import type { SessionUser } from "hono-kit";
 import { expect, it } from "vitest";
 import { carol, request, someone } from "../../../test/fixtures";
-
-const inNovember = new Date("2026-11-15T10:00:00+09:00");
-
-type Order = {
-  id: string;
-  status: string;
-  subtotal: number;
-  discount: number;
-  shippingFee: number;
-  total: number;
-  tax: number;
-  couponCode: string | null;
-  paymentDueAt: string;
-  lines: { bookId: string; title: string; unitPrice: number; quantity: number; discount: number }[];
-};
-
-/** A book with this much stock */
-const bookWith = async (price: number, stock: number) => {
-  const res = await request(carol, "POST", "/books", {
-    title: `本${price}`,
-    author: "著者",
-    price,
-  });
-  const { id } = (await res.json()) as { id: string };
-  await request(carol, "PUT", `/books/${id}/stock`, { quantity: stock, version: 0 });
-  return id;
-};
-
-const stockOf = async (id: string) =>
-  ((await (await request(null, "GET", `/books/${id}`)).json()) as { stock: { quantity: number } })
-    .stock.quantity;
-
-const put = (who: SessionUser, bookId: string, quantity: number) =>
-  request(who, "PUT", `/cart/items/${bookId}`, { quantity });
-
-const fixed500 = async () => {
-  const code = `c${crypto.randomUUID().slice(0, 8)}`;
-  await request(carol, "POST", "/coupons", {
-    code,
-    kind: "fixed",
-    value: 500,
-    minSubtotal: 3000,
-    startsAt: "2026-11-01T00:00:00+09:00",
-    endsAt: "2026-12-01T00:00:00+09:00",
-  });
-  return code;
-};
-
-const place = (who: SessionUser, couponCode?: string) =>
-  request(who, "POST", "/orders", couponCode === undefined ? {} : { couponCode }, inNovember);
+import { bookWith, fixed500, place, put, stockOf, type Order } from "./_test-helpers";
 
 it("places the cart as an order: the design's fixed coupon example", async () => {
   const me = someone();

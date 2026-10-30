@@ -3,3 +3,4 @@ export * from "./queries";
 export * from "./usecases/createCoupon";
 export * from "./usecases/stopCoupon";
 export * from "./usecases/useCoupon";
+export * from "./usecases/releaseCouponUse";

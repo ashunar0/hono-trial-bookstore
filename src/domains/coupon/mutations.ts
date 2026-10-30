@@ -15,3 +15,10 @@ export const markStopped = (db: Db, id: string, at: Date) =>
 
 export const insertCouponUse = (db: Db, row: typeof couponUsesTable.$inferInsert) =>
   db.insert(couponUsesTable).values(row);
+
+/** Gives a use back. Run again, it changes nothing */
+export const markUseReleased = (db: Db, id: string, at: Date) =>
+  db
+    .update(couponUsesTable)
+    .set({ status: "released", releasedAt: at })
+    .where(and(eq(couponUsesTable.id, id), eq(couponUsesTable.status, "used")));

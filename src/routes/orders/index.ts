@@ -56,6 +56,6 @@ export const POST = createEndpoint(
     });
     if (!result.ok) return reply.failure(result.error);
 
-    return reply.success(orderResponse(result.value.order, result.value.lines));
+    return reply.success(orderResponse(result.value.order, result.value.lines, []));
   },
 );

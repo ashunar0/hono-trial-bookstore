@@ -1,7 +1,7 @@
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { updateWithVersion } from "hono-kit/sqlite";
 import type { Db } from "#/db/index";
-import { orderLinesTable, ordersTable } from "#/db/schema";
+import { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
 
 type OrderRow = typeof ordersTable.$inferInsert;
 type LineRow = typeof orderLinesTable.$inferInsert;
@@ -23,3 +23,13 @@ export const updateOrder = (
   at: { id: string; version: number },
   values: Partial<Omit<OrderRow, "id" | "version">>,
 ) => updateWithVersion(db, ordersTable, at, values);
+
+export const insertRefund = (db: Db, row: typeof refundsTable.$inferInsert) =>
+  db.insert(refundsTable).values(row);
+
+/** Records that a cancel gave everything back. Not a change the customer sees, so the version stays */
+export const markReleased = (db: Db, id: string, at: Date) =>
+  db
+    .update(ordersTable)
+    .set({ releasedAt: at })
+    .where(and(eq(ordersTable.id, id), isNull(ordersTable.releasedAt)));

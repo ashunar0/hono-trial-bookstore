@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createEndpoint, errorResponses, NotFound, requireAuth } from "hono-kit";
-import { findOrder, linesOf } from "#/domains/order/index";
-import { orderResponse, orderResponseSchema } from "../_response";
+import { findOrder } from "#/domains/order/index";
+import { readOrder } from "../_read";
+import { orderResponseSchema } from "../_response";
 
 /** A customer sees their own; someone else's, and any order still being placed, is 404 */
 export const GET = createEndpoint(
@@ -17,6 +18,6 @@ export const GET = createEndpoint(
     if (order === undefined || order.status === "placing") return reply.failure(NotFound.code);
     if (user.role !== "staff" && order.customerId !== user.id) return reply.failure(NotFound.code);
 
-    return reply.success(orderResponse(order, await linesOf(db, order.id)));
+    return reply.success(await readOrder(db, order));
   },
 );

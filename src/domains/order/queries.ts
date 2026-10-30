@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
 import type { UserId } from "hono-kit";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
-import { orderLinesTable, ordersTable } from "#/db/schema";
+import { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
 import { visibleStatuses } from "./rules";
 
 /** Any status, placing too: the caller decides what to show */
@@ -46,3 +46,10 @@ export const listOrders = async (
     .limit(limit + 1);
   return toPage(rows, limit, (row) => ({ at: row.createdAt, id: row.id }));
 };
+
+export const refundsOf = (db: Db, orderId: string) =>
+  db
+    .select()
+    .from(refundsTable)
+    .where(eq(refundsTable.orderId, orderId))
+    .orderBy(asc(refundsTable.createdAt), asc(refundsTable.id));

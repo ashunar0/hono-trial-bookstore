@@ -213,3 +213,18 @@ export const orderLinesTable = sqliteTable(
     index("order_lines_order").on(t.orderId, t.position),
   ],
 );
+
+/** Money given back: a whole order on a cancel (returnId null), or the books of one return */
+export const refundsTable = sqliteTable("refunds", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => ordersTable.id),
+  /** Null for a cancel. One refund per return */
+  returnId: text("return_id").unique(),
+  /** Yen, tax included */
+  amount: integer("amount").notNull(),
+  /** The tax within amount */
+  tax: integer("tax").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});

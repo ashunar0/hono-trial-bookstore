@@ -45,3 +45,16 @@ export const OrderStatusConflict = {
   message: "The order is not in a state that allows this (or it changed after it was read)",
   details: z.object({ status: z.enum(orderStatuses) }),
 } as const;
+
+/** What each operation needs the order to be in */
+export const canPay = (status: OrderStatus) => status === "awaiting_payment";
+export const canShip = (status: OrderStatus) => status === "paid";
+/** Before shipping. placing too, for the cron: a placing order is never shown, so no one else can ask */
+export const canCancel = (status: OrderStatus) =>
+  status === "placing" || status === "awaiting_payment" || status === "paid";
+
+export const PaymentDeadlinePassed = {
+  code: "PAYMENT_DEADLINE_PASSED",
+  kind: "unprocessable",
+  message: "The payment deadline has passed (the order is cancelled soon, if it is not yet)",
+} as const;

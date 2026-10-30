@@ -1,9 +1,10 @@
 import { z } from "zod";
-import type { orderLinesTable, ordersTable } from "#/db/schema";
+import type { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
 import { orderStatuses } from "#/domains/order/rules";
 
 type OrderRow = typeof ordersTable.$inferSelect;
 type LineRow = typeof orderLinesTable.$inferSelect;
+type RefundRow = typeof refundsTable.$inferSelect;
 
 const lineSchema = z.object({
   id: z.string(),
@@ -35,8 +36,19 @@ export const orderSummarySchema = z.object({
   createdAt: z.string(),
 });
 
-/** GET /orders/:id, and what POST /orders returns */
-export const orderResponseSchema = orderSummarySchema.extend({ lines: z.array(lineSchema) });
+const refundSchema = z.object({
+  id: z.string(),
+  /** null for a cancel */
+  returnId: z.string().nullable(),
+  amount: z.number(),
+  tax: z.number(),
+});
+
+/** GET /orders/:id, and what a write to an order returns */
+export const orderResponseSchema = orderSummarySchema.extend({
+  lines: z.array(lineSchema),
+  refunds: z.array(refundSchema),
+});
 
 const iso = (at: Date | null) => at?.toISOString() ?? null;
 
@@ -60,6 +72,7 @@ export const orderSummary = (row: OrderRow): z.infer<typeof orderSummarySchema> 
 export const orderResponse = (
   row: OrderRow,
   lines: LineRow[],
+  refunds: RefundRow[],
 ): z.infer<typeof orderResponseSchema> => ({
   ...orderSummary(row),
   lines: lines.map((line) => ({
@@ -69,5 +82,11 @@ export const orderResponse = (
     unitPrice: line.unitPrice,
     quantity: line.quantity,
     discount: line.discount,
+  })),
+  refunds: refunds.map((refund) => ({
+    id: refund.id,
+    returnId: refund.returnId,
+    amount: refund.amount,
+    tax: refund.tax,
   })),
 });
