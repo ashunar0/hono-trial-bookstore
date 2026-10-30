@@ -1,5 +1,5 @@
 import { err, NotFound, ok, type DepsVariables, type UserId } from "hono-kit";
-import { deleteReturn, insertReturn, updateOrder } from "../mutations";
+import { insertReturn, updateOrder } from "../mutations";
 import { linesOf, returnedCopies } from "../queries";
 import {
   OrderStatusConflict,
@@ -21,8 +21,8 @@ type Input = {
  * The customer asks to send books of a shipped order back. Nothing is refunded until staff receive them.
  * 404 (the order, or a line not in it) → not shipped 409 → past 14 days 422 → more copies than are left 409.
  * Requested and completed returns count against the copies; rejected ones do not.
- * The order's version moves with the request, so of two requests at once one loses (409) instead of both counting
- * the same copies
+ * The order's version moves first, and only the one that moved it writes its return: of two requests at once one
+ * loses (409) instead of both counting the same copies, and the loser writes nothing it would have to take back
  */
 export const requestReturn = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
@@ -52,19 +52,22 @@ export const requestReturn = async (deps: DepsVariables["deps"], input: Input) =
     requestedAt: input.now,
     version: 1,
   };
-  const [moved] = await db.batch([
-    updateOrder(db, { id: order.id, version: order.version }, { updatedAt: input.now }),
-    ...insertReturn(
+  const [moved] = await updateOrder(
+    db,
+    { id: order.id, version: order.version },
+    { updatedAt: input.now },
+  );
+  // Another request (or a change) got in after the read
+  if (moved === undefined)
+    return err({ code: OrderStatusConflict.code, details: { status: order.status } });
+  // If this stops here, only the version moved: the customer asks again
+  await db.batch(
+    insertReturn(
       db,
       row,
       input.lines.map((line) => ({ returnId: row.id, ...line })),
     ),
-  ]);
-  // Another request (or a change) got in after the read: this one is taken back
-  if (moved.length === 0) {
-    await db.batch(deleteReturn(db, row.id));
-    return err({ code: OrderStatusConflict.code, details: { status: order.status } });
-  }
+  );
 
   return ok({
     ...row,
