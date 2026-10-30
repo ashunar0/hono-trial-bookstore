@@ -137,3 +137,30 @@ it("puts back the stock of a return completed when the Worker died before restoc
   const [row] = await db().select().from(returnsTable).where(eq(returnsTable.id, asked.id));
   expect(row?.stockReturnedAt).toEqual(expect.any(Date));
 });
+
+it("one order that fails does not stop the others, and the run still fails so it is seen", async () => {
+  const one = await placedOrder(someone(), await bookWith(1000, 5));
+  const two = await placedOrder(someone(), await bookWith(1000, 5));
+  // The first update the cron makes fails, as a database that hiccups once would
+  const real = makeDeps(env);
+  let failed = false;
+  const db = new Proxy(real.db, {
+    get(target, key) {
+      if (key === "update" && !failed) {
+        failed = true;
+        return () => {
+          throw new Error("boom");
+        };
+      }
+      const value = Reflect.get(target, key);
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+
+  await expect(
+    sweepOrders({ deps: { ...real, db }, now: new Date("2026-11-18T10:00:00+09:00") }),
+  ).rejects.toThrow("boom");
+
+  const statuses = [(await statusOf(one.id))?.status, (await statusOf(two.id))?.status].sort();
+  expect(statuses).toEqual(["awaiting_payment", "cancelled"]);
+});
