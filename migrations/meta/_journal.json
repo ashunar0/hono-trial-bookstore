@@ -15,6 +15,13 @@
       "when": 1793356198479,
       "tag": "0001_heavy_loners",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1793356581705,
+      "tag": "0002_nostalgic_bedlam",
+      "breakpoints": true
     }
   ]
 }
