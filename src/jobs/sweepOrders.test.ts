@@ -31,10 +31,11 @@ it("cancels an order past its payment deadline, and gives back its stock and cou
   const code = await fixed500();
   const order = await placedOrder(me, book, code);
 
-  await sweep(new Date("2026-11-18T09:59:59+09:00"));
+  // The deadline itself still pays, so the run at that minute leaves it
+  await sweep(new Date("2026-11-18T10:00:00+09:00"));
   expect((await statusOf(order.id))?.status).toBe("awaiting_payment");
 
-  await sweep(new Date("2026-11-18T10:00:00+09:00"));
+  await sweep(new Date("2026-11-18T10:15:00+09:00"));
   expect(await statusOf(order.id)).toMatchObject({
     status: "cancelled",
     releasedAt: expect.any(Date),
@@ -158,7 +159,7 @@ it("one order that fails does not stop the others, and the run still fails so it
   });
 
   await expect(
-    sweepOrders({ deps: { ...real, db }, now: new Date("2026-11-18T10:00:00+09:00") }),
+    sweepOrders({ deps: { ...real, db }, now: new Date("2026-11-18T10:15:00+09:00") }),
   ).rejects.toThrow("boom");
 
   const statuses = [(await statusOf(one.id))?.status, (await statusOf(two.id))?.status].sort();

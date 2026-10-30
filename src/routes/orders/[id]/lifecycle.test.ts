@@ -33,7 +33,7 @@ it("pay: 422 past the deadline, 409 when not awaiting payment, 404 for someone e
   const me = someone();
   const order = await placedOrder(me, await bookWith(1000, 5));
 
-  const late = await pay(me, order.id, at("2026-11-18T10:00:00+09:00"));
+  const late = await pay(me, order.id, at("2026-11-18T10:00:00.001+09:00"));
   expect(late.status).toBe(422);
   expect(await late.json()).toMatchObject({ error: { code: "PAYMENT_DEADLINE_PASSED" } });
 
@@ -117,4 +117,15 @@ it("a payment after a cancel loses", async () => {
   expect(await res.json()).toMatchObject({
     error: { code: "ORDER_STATUS_CONFLICT", details: { status: "cancelled" } },
   });
+});
+
+it("pay: the deadline itself still pays (within 3 days), and a paid order is 409 even past it", async () => {
+  const me = someone();
+  const order = await placedOrder(me, await bookWith(1000, 5));
+
+  expect((await pay(me, order.id, at("2026-11-18T10:00:00+09:00"))).status).toBe(200);
+
+  const again = await pay(me, order.id, at("2026-11-20T10:00:00+09:00"));
+  expect(again.status).toBe(409);
+  expect(await again.json()).toMatchObject({ error: { code: "ORDER_STATUS_CONFLICT" } });
 });
