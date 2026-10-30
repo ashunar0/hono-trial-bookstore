@@ -27,6 +27,6 @@ export const makeAuth = (env: Env) =>
 export const sessionUserOf = (auth: ReturnType<typeof makeAuth>) => async (headers: Headers) => {
   const found = await auth.api.getSession({ headers });
   if (found === null) return null;
-  const { id, name, email } = found.user;
-  return { id, name, email };
+  const { id, name, email, role } = found.user;
+  return { id, name, email, role };
 };

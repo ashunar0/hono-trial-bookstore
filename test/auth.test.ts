@@ -31,7 +31,7 @@ it("anyone can sign up, and the session cookie reads back as that account", asyn
 
   const signedIn = await makeDeps(env).sessionUser(new Headers({ Cookie: cookie }));
 
-  expect(signedIn?.email).toBe(email);
+  expect(signedIn).toMatchObject({ email, role: "customer" });
 });
 
 it("a made-up cookie is signed out", async () => {
