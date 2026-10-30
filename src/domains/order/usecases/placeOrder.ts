@@ -4,7 +4,7 @@ import { cartItemsOf, emptyCart } from "#/domains/cart/index";
 import { findCouponByCode, useCoupon } from "#/domains/coupon/index";
 import { CouponNotApplicable } from "#/domains/coupon/rules";
 import { releaseReservation, reserveStock } from "#/domains/inventory/index";
-import { estimate } from "#/domains/pricing/rules";
+import { priceCart } from "#/domains/pricing/rules";
 import { deleteOrder, insertOrder, updateOrder } from "../mutations";
 import { findOrder } from "../queries";
 import { giveBack } from "./_giveBack";
@@ -26,24 +26,18 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
 
   const items = await cartItemsOf(db, customerId);
   if (items.length === 0) return err(CartEmpty.code);
-  const books = new Map(
-    (
-      await findBooks(
-        db,
-        items.map((i) => i.bookId),
-      )
-    ).map((b) => [b.id, b]),
+  const books = await findBooks(
+    db,
+    items.map((i) => i.bookId),
   );
-  const lines = items.flatMap((item) => {
-    const book = books.get(item.bookId);
-    return book === undefined
-      ? []
-      : [{ bookId: book.id, title: book.title, unitPrice: book.price, quantity: item.quantity }];
-  });
-
   const coupon =
     input.couponCode === undefined ? undefined : await findCouponByCode(db, input.couponCode);
-  const money = estimate(lines, input.couponCode === undefined ? null : { coupon }, now);
+  const { lines, ...money } = priceCart(
+    items,
+    books,
+    input.couponCode === undefined ? null : { coupon },
+    now,
+  );
   if (money.notApplicable !== null)
     return err({ code: CouponNotApplicable.code, details: { reason: money.notApplicable } });
   const discounts = allocateDiscount(
