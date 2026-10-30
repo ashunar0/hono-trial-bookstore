@@ -3,4 +3,7 @@ export * from "./queries";
 export * from "./usecases/cancelOrder";
 export * from "./usecases/payOrder";
 export * from "./usecases/placeOrder";
+export * from "./usecases/receiveReturn";
+export * from "./usecases/rejectReturn";
+export * from "./usecases/requestReturn";
 export * from "./usecases/shipOrder";

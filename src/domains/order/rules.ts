@@ -61,3 +61,53 @@ export const PaymentDeadlinePassed = {
 
 /** A placing order older than this stopped halfway: the cron cancels it */
 export const placingTimeoutMs = 10 * 60 * 1000;
+
+export const returnStatuses = ["requested", "completed", "rejected"] as const;
+
+/** A return is requested within 14 days of shipping */
+export const returnDeadlineOf = (shippedAt: Date) =>
+  new Date(shippedAt.getTime() + 14 * 24 * 60 * 60 * 1000);
+
+/** How many copies of a line can still be asked back: shipped, less the requested and completed ones */
+export const returnableOf = (shipped: number, counted: number) => Math.max(shipped - counted, 0);
+
+/**
+ * The money given back for `returning` copies of a line, when `before` copies of it were already refunded.
+ * Each copy is its price less its share of the line's discount: the share drops its fraction, and the line's last
+ * copy takes what is left, so the whole line given back is exactly what was paid for it
+ */
+export const refundOf = (
+  line: { unitPrice: number; quantity: number; discount: number },
+  before: number,
+  returning: number,
+) => {
+  const share = Math.floor(line.discount / line.quantity);
+  const lastShare = line.discount - share * (line.quantity - 1);
+  let amount = 0;
+  for (let copy = before; copy < before + returning; copy++)
+    amount += line.unitPrice - (copy === line.quantity - 1 ? lastShare : share);
+  return amount;
+};
+
+export const ReturnPeriodEnded = {
+  code: "RETURN_PERIOD_ENDED",
+  kind: "unprocessable",
+  message: "Returns are taken within 14 days of shipping",
+} as const;
+
+export const ReturnQuantityExceeded = {
+  code: "RETURN_QUANTITY_EXCEEDED",
+  kind: "conflict",
+  message: "More copies than can be returned",
+  /** How many copies of each line asked for can still be returned */
+  details: z.object({
+    lines: z.array(z.object({ orderLineId: z.string(), returnable: z.number() })),
+  }),
+} as const;
+
+export const ReturnStatusConflict = {
+  code: "RETURN_STATUS_CONFLICT",
+  kind: "conflict",
+  message: "The return is not awaiting a decision (or it changed after it was read)",
+  details: z.object({ status: z.enum(returnStatuses) }),
+} as const;

@@ -1,7 +1,7 @@
 import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
-import { ordersTable } from "#/db/schema";
+import { ordersTable, returnsTable } from "#/db/schema";
 import { reserveStock } from "#/domains/inventory/index";
 import { makeDeps } from "#/main";
 import { db, request, someone } from "../../test/fixtures";
@@ -12,6 +12,7 @@ import {
   placedOrder,
   put,
   place,
+  shippedOrder,
   stockOf,
   type Order,
 } from "../routes/orders/_test-helpers";
@@ -104,4 +105,35 @@ it("finishes a cancel that stopped after switching to cancelled", async () => {
 
   expect(await statusOf(order.id)).toMatchObject({ releasedAt: expect.any(Date) });
   expect(await stockOf(book)).toBe(5);
+});
+
+it("puts back the stock of a return completed when the Worker died before restocking", async () => {
+  const me = someone();
+  const book = await bookWith(1000, 5);
+  await put(me, book, 1);
+  const order = await shippedOrder(me);
+  const asked = (await (
+    await request(
+      me,
+      "POST",
+      `/orders/${order.id}/returns`,
+      {
+        lines: [{ orderLineId: order.lines[0]!.id, quantity: 1 }],
+      },
+      inNovember,
+    )
+  ).json()) as { id: string };
+  // Completed, then nothing more
+  await db()
+    .update(returnsTable)
+    .set({ status: "completed", completedAt: inNovember })
+    .where(eq(returnsTable.id, asked.id));
+  expect(await stockOf(book)).toBe(4);
+
+  await sweep(new Date("2026-11-15T11:00:00+09:00"));
+  await sweep(new Date("2026-11-15T11:15:00+09:00"));
+
+  expect(await stockOf(book)).toBe(5);
+  const [row] = await db().select().from(returnsTable).where(eq(returnsTable.id, asked.id));
+  expect(row?.stockReturnedAt).toEqual(expect.any(Date));
 });

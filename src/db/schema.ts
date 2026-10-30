@@ -13,7 +13,7 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { couponKinds } from "#/domains/coupon/rules";
-import { orderStatuses } from "#/domains/order/rules";
+import { orderStatuses, returnStatuses } from "#/domains/order/rules";
 
 export * from "./auth-schema";
 
@@ -78,6 +78,29 @@ export const reservationLinesTable = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.reservationId, t.bookId] }),
     check("reservation_lines_quantity_positive", sql`${t.quantity} > 0`),
+  ],
+);
+
+/** Stock put back from somewhere (a return), by its id: once per id */
+export const restocksTable = sqliteTable("restocks", {
+  id: text("id").primaryKey(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const restockLinesTable = sqliteTable(
+  "restock_lines",
+  {
+    restockId: text("restock_id")
+      .notNull()
+      .references(() => restocksTable.id),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => booksTable.id),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.restockId, t.bookId] }),
+    check("restock_lines_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );
 
@@ -213,6 +236,47 @@ export const orderLinesTable = sqliteTable(
   (t) => [
     check("order_lines_quantity_positive", sql`${t.quantity} > 0`),
     index("order_lines_order").on(t.orderId, t.position),
+  ],
+);
+
+/** A customer asks to send books back. Staff receive it (refund, stock back) or reject it */
+export const returnsTable = sqliteTable(
+  "returns",
+  {
+    id: text("id").primaryKey(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    status: text("status", { enum: returnStatuses }).notNull(),
+    /** Why staff rejected it */
+    rejectReason: text("reject_reason"),
+    requestedAt: integer("requested_at", { mode: "timestamp_ms" }).notNull(),
+    completedAt: integer("completed_at", { mode: "timestamp_ms" }),
+    rejectedAt: integer("rejected_at", { mode: "timestamp_ms" }),
+    /** When the stock was put back after completing. Null on a completed return: the cron finishes it */
+    stockReturnedAt: integer("stock_returned_at", { mode: "timestamp_ms" }),
+    version: integer("version").notNull(),
+  },
+  (t) => [
+    index("returns_order").on(t.orderId),
+    index("returns_requested_at").on(t.requestedAt, t.id),
+  ],
+);
+
+export const returnLinesTable = sqliteTable(
+  "return_lines",
+  {
+    returnId: text("return_id")
+      .notNull()
+      .references(() => returnsTable.id),
+    orderLineId: text("order_line_id")
+      .notNull()
+      .references(() => orderLinesTable.id),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.returnId, t.orderLineId] }),
+    check("return_lines_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );
 

@@ -1,6 +1,12 @@
 import { and, eq, exists, sql } from "drizzle-orm";
 import type { Db } from "#/db/index";
-import { reservationLinesTable, reservationsTable, stocksTable } from "#/db/schema";
+import {
+  reservationLinesTable,
+  reservationsTable,
+  restockLinesTable,
+  restocksTable,
+  stocksTable,
+} from "#/db/schema";
 
 /** No row back when the book already has one (made by someone else in between) */
 export const insertStock = (db: Db, row: typeof stocksTable.$inferInsert) =>
@@ -89,3 +95,25 @@ export const giveBackHold = (db: Db, at: { reservationId: string; now: Date }) =
       ),
   ] as const;
 };
+
+/**
+ * Puts stock back under an id: the record, its lines, and each stock taken up. Run in one batch: a second run with
+ * the id fails the primary key and changes nothing
+ */
+export const putBack = (db: Db, at: { restockId: string; now: Date }, lines: Held[]) =>
+  [
+    db.insert(restocksTable).values({ id: at.restockId, createdAt: at.now }),
+    db
+      .insert(restockLinesTable)
+      .values(lines.map((line) => ({ restockId: at.restockId, ...line }))),
+    ...lines.map((line) =>
+      db
+        .update(stocksTable)
+        .set({
+          quantity: sql`${stocksTable.quantity} + ${line.quantity}`,
+          version: sql`${stocksTable.version} + 1`,
+          updatedAt: at.now,
+        })
+        .where(eq(stocksTable.bookId, line.bookId)),
+    ),
+  ] as const;

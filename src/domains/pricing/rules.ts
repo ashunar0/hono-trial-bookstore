@@ -10,6 +10,9 @@ export const shippingFee = 550;
 
 type Line = { unitPrice: number; quantity: number };
 
+/** The tax within a tax-included amount: × 10/110, dropping the fraction. Once per order, and once per refund */
+export const taxWithin = (amount: number) => Math.floor((amount * 10) / 110);
+
 /**
  * subtotal → the coupon (off the books only) → shipping, decided after the coupon → total → the tax within it,
  * total × 10/110 dropping the fraction, once per order (books and shipping are both 10%).
@@ -26,7 +29,7 @@ export const estimate = (
   const afterDiscount = subtotal - discount;
   const shipping = lines.length === 0 || afterDiscount >= freeShippingFrom ? 0 : shippingFee;
   const total = afterDiscount + shipping;
-  const tax = Math.floor((total * 10) / 110);
+  const tax = taxWithin(total);
   const notApplicable: NotApplicableReason | null =
     applied !== null && "reason" in applied ? applied.reason : null;
   return { subtotal, discount, shippingFee: shipping, total, tax, notApplicable };

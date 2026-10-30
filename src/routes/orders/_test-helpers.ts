@@ -17,7 +17,14 @@ export type Order = {
   paidAt: string | null;
   shippedAt: string | null;
   cancelledAt: string | null;
-  lines: { bookId: string; title: string; unitPrice: number; quantity: number; discount: number }[];
+  lines: {
+    id: string;
+    bookId: string;
+    title: string;
+    unitPrice: number;
+    quantity: number;
+    discount: number;
+  }[];
   refunds: { returnId: string | null; amount: number; tax: number }[];
 };
 
@@ -61,4 +68,13 @@ export const place = (who: SessionUser, couponCode?: string) =>
 export const placedOrder = async (who: SessionUser, bookId: string, couponCode?: string) => {
   await put(who, bookId, 1);
   return (await (await place(who, couponCode)).json()) as Order;
+};
+
+/** Places the cart in November, pays and ships it then */
+export const shippedOrder = async (who: SessionUser, couponCode?: string) => {
+  const placed = (await (await place(who, couponCode)).json()) as Order;
+  await request(who, "POST", `/orders/${placed.id}/pay`, undefined, inNovember);
+  return (await (
+    await request(carol, "POST", `/orders/${placed.id}/ship`, undefined, inNovember)
+  ).json()) as Order;
 };

@@ -1,7 +1,13 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { updateWithVersion } from "hono-kit/sqlite";
 import type { Db } from "#/db/index";
-import { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
+import {
+  orderLinesTable,
+  ordersTable,
+  refundsTable,
+  returnLinesTable,
+  returnsTable,
+} from "#/db/schema";
 
 type OrderRow = typeof ordersTable.$inferInsert;
 type LineRow = typeof orderLinesTable.$inferInsert;
@@ -33,3 +39,31 @@ export const markReleased = (db: Db, id: string, at: Date) =>
     .update(ordersTable)
     .set({ releasedAt: at })
     .where(and(eq(ordersTable.id, id), isNull(ordersTable.releasedAt)));
+
+/** The return and its lines. Run in one batch */
+export const insertReturn = (
+  db: Db,
+  row: typeof returnsTable.$inferInsert,
+  lines: (typeof returnLinesTable.$inferInsert)[],
+) => [db.insert(returnsTable).values(row), db.insert(returnLinesTable).values(lines)] as const;
+
+/** A return whose request lost to another, as if it had never been. Run in one batch */
+export const deleteReturn = (db: Db, id: string) =>
+  [
+    db.delete(returnLinesTable).where(eq(returnLinesTable.returnId, id)),
+    db.delete(returnsTable).where(eq(returnsTable.id, id)),
+  ] as const;
+
+/** No row back when the version is no longer the one read */
+export const updateReturn = (
+  db: Db,
+  at: { id: string; version: number },
+  values: Partial<Omit<typeof returnsTable.$inferInsert, "id" | "version">>,
+) => updateWithVersion(db, returnsTable, at, values);
+
+/** Records that a completed return's stock is back. Not a change anyone sees, so the version stays */
+export const markStockReturned = (db: Db, id: string, at: Date) =>
+  db
+    .update(returnsTable)
+    .set({ stockReturnedAt: at })
+    .where(and(eq(returnsTable.id, id), isNull(returnsTable.stockReturnedAt)));
