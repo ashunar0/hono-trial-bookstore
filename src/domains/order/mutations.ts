@@ -30,8 +30,12 @@ export const updateOrder = (
   values: Partial<Omit<OrderRow, "id" | "version">>,
 ) => updateWithVersion(db, ordersTable, at, values);
 
+/**
+ * Its id is fixed by what it refunds (refundIdOf), so running it again adds nothing:
+ * a cancel or a receive that stopped halfway is finished by running it again
+ */
 export const insertRefund = (db: Db, row: typeof refundsTable.$inferInsert) =>
-  db.insert(refundsTable).values(row);
+  db.insert(refundsTable).values(row).onConflictDoNothing();
 
 /** Records that a cancel gave everything back. Not a change the customer sees, so the version stays */
 export const markReleased = (db: Db, id: string, at: Date) =>

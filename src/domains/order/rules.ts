@@ -89,6 +89,10 @@ export const refundOf = (
   return amount;
 };
 
+/** A refund's id, fixed by what it gives back: one per cancelled order, one per return */
+export const refundIdOf = (of: { orderId: string } | { returnId: string }) =>
+  "orderId" in of ? `refund-order-${of.orderId}` : `refund-return-${of.returnId}`;
+
 export const ReturnPeriodEnded = {
   code: "RETURN_PERIOD_ENDED",
   kind: "unprocessable",

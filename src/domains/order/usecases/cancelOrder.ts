@@ -1,5 +1,5 @@
 import { err, NotFound, ok, type DepsVariables } from "hono-kit";
-import { insertRefund, updateOrder } from "../mutations";
+import { updateOrder } from "../mutations";
 import { findOrder } from "../queries";
 import { canCancel, OrderStatusConflict } from "../rules";
 import { giveBack } from "./_giveBack";
@@ -17,8 +17,7 @@ type Input = {
 /**
  * Cancels before shipping. The order switches to cancelled first: once the stock is back someone else can buy it,
  * so a payment coming in at the same time must lose before anything is given back.
- * 1 cancelled (and a refund of the whole total if it was paid, in the same batch) → 2 the stock back →
- * 3 the coupon back → record it is done. 404 → the status and the version.
+ * 1 cancelled → 2 the whole total back if it was paid → 3 the stock back → 4 the coupon back → record it is done. 404 → the status and the version.
  * The cron calls it for an order past its payment deadline, one left placing, and one whose giving back stopped
  */
 export const cancelOrder = async (deps: DepsVariables["deps"], input: Input) => {
@@ -39,22 +38,10 @@ export const cancelOrder = async (deps: DepsVariables["deps"], input: Input) => 
     { id: order.id, version: input.version },
     { status: "cancelled", cancelledAt: input.now, updatedAt: input.now },
   );
-  const refund =
-    order.status === "paid"
-      ? insertRefund(db, {
-          id: crypto.randomUUID(),
-          orderId: order.id,
-          returnId: null,
-          amount: order.total,
-          tax: order.tax,
-          createdAt: input.now,
-        })
-      : undefined;
-  const [[cancelled]] =
-    refund === undefined ? await db.batch([switched]) : await db.batch([switched, refund]);
+  const [cancelled] = await switched;
   if (cancelled === undefined) return conflictNow(db, order.id);
 
-  // 2, 3
+  // 2, 3, 4
   await giveBack(deps, cancelled, input.now);
 
   return ok((await findOrder(db, order.id)) ?? order);

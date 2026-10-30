@@ -3,7 +3,7 @@ import { restock } from "#/domains/inventory/index";
 import { insertRefund, markStockReturned, updateReturn } from "../mutations";
 import { findReturn, linesOf, returnedCopies, returnLinesOf } from "../queries";
 import { taxWithin } from "#/domains/pricing/rules";
-import { refundOf, ReturnStatusConflict } from "../rules";
+import { refundIdOf, refundOf, ReturnStatusConflict } from "../rules";
 
 type Input = {
   returnId: string;
@@ -13,8 +13,9 @@ type Input = {
 };
 
 /**
- * Staff got the books: 1 the return completed and its refund (one batch, the same domain) → 2 the stock back
- * under the return's id → record it is back. 2 is safe to run again, so the cron finishes a receive that stopped
+ * Staff got the books: 1 the return completed → 2 its refund → 3 the stock back under the return's id → record it
+ * is back. Only the one that won 1 goes on (a refund in the same batch as 1 would be tried even when 1 lost).
+ * 2 and 3 are safe to run again, so the cron finishes a receive that stopped
  */
 export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
@@ -27,31 +28,13 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
     if (found.status !== "requested")
       return err({ code: ReturnStatusConflict.code, details: { status: found.status } });
 
-    // 1. Copies of each line refunded before this return
-    const before = await returnedCopies(db, found.orderId, ["completed"], found.id);
-    const amount = lines.reduce((sum, line) => {
-      const orderLine = orderLines.get(line.orderLineId);
-      return orderLine === undefined
-        ? sum
-        : sum + refundOf(orderLine, before.get(line.orderLineId) ?? 0, line.quantity);
-    }, 0);
-    const [completed] = await db.batch([
-      updateReturn(
-        db,
-        { id: found.id, version: found.version },
-        { status: "completed", completedAt: input.now },
-      ),
-      insertRefund(db, {
-        id: crypto.randomUUID(),
-        orderId: found.orderId,
-        returnId: found.id,
-        amount,
-        // Once on the whole refund, as for an order
-        tax: taxWithin(amount),
-        createdAt: input.now,
-      }),
-    ]);
-    if (completed.length === 0) {
+    // 1
+    const [completed] = await updateReturn(
+      db,
+      { id: found.id, version: found.version },
+      { status: "completed", completedAt: input.now },
+    );
+    if (completed === undefined) {
       const current = await findReturn(db, found.id);
       return err({
         code: ReturnStatusConflict.code,
@@ -60,7 +43,25 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
     }
   }
 
-  // 2
+  // 2. Copies of each line refunded before this return: the same on a second run, which counts this one out
+  const before = await returnedCopies(db, found.orderId, ["completed"], found.id);
+  const amount = lines.reduce((sum, line) => {
+    const orderLine = orderLines.get(line.orderLineId);
+    return orderLine === undefined
+      ? sum
+      : sum + refundOf(orderLine, before.get(line.orderLineId) ?? 0, line.quantity);
+  }, 0);
+  await insertRefund(db, {
+    id: refundIdOf({ returnId: found.id }),
+    orderId: found.orderId,
+    returnId: found.id,
+    amount,
+    // Once on the whole refund, as for an order
+    tax: taxWithin(amount),
+    createdAt: input.now,
+  });
+
+  // 3
   await restock(deps, {
     restockId: found.id,
     lines: lines.flatMap((line) => {
