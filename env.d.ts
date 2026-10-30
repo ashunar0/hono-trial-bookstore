@@ -10,6 +10,10 @@ declare global {
 
   interface Env {
     DB: D1Database;
+    /** Signs Better Auth's sessions. A secret: `wrangler secret put BETTER_AUTH_SECRET`, .dev.vars locally */
+    BETTER_AUTH_SECRET: string;
+    /** Where the app is served (http://localhost:8787 locally) */
+    BETTER_AUTH_URL: string;
   }
 }
 

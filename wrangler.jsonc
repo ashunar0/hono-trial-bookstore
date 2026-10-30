@@ -3,6 +3,8 @@
   "name": "bookstore",
   "main": "src/main.ts",
   "compatibility_date": "2026-09-01",
+  // Better Auth's baseURL. Not deployed, so only the local one
+  "vars": { "BETTER_AUTH_URL": "http://localhost:8787" },
   // Writes src/routes.gen.ts before wrangler dev and wrangler deploy, and again while dev runs when src/routes changes
   "build": { "command": "pnpm hnk prepare", "watch_dir": "src/routes" },
   "d1_databases": [

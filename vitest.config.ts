@@ -8,7 +8,13 @@ export default defineConfig({
   plugins: [
     cloudflareTest({
       wrangler: { configPath: "./wrangler.jsonc" },
-      miniflare: { bindings: { TEST_MIGRATIONS: migrations } },
+      miniflare: {
+        bindings: {
+          TEST_MIGRATIONS: migrations,
+          BETTER_AUTH_SECRET: "test-secret-at-least-32-characters-long",
+          BETTER_AUTH_URL: "http://localhost",
+        },
+      },
     }),
   ],
   test: {
