@@ -49,7 +49,7 @@ const readOr = (file, fallback) => {
   }
 };
 
-/** ドメインごとの rules.ts が export する名前と、ドメインどうしの依存（ファイルを読んで 1 度だけ作る） */
+/** ドメインどうしの依存（ファイルを読んで 1 度だけ作る）。rules どうしの直接の import も数える */
 let world;
 const worldOf = (root) => {
   if (world) return world;
@@ -57,20 +57,8 @@ const worldOf = (root) => {
   const domains = fs.existsSync(dir)
     ? fs.readdirSync(dir).filter((d) => fs.statSync(path.join(dir, d)).isDirectory())
     : [];
-  const rulesNames = new Map();
   const edges = new Map();
   for (const d of domains) {
-    const rules = readOr(path.join(dir, d, "rules.ts"), "");
-    rulesNames.set(
-      d,
-      new Set(
-        [
-          ...rules.matchAll(
-            /^export (?:const|function|async function|type|interface|class) (\w+)/gm,
-          ),
-        ].map((m) => m[1]),
-      ),
-    );
     const files = [];
     const walk = (p) => {
       for (const e of fs.readdirSync(p, { withFileTypes: true })) {
@@ -90,7 +78,7 @@ const worldOf = (root) => {
     }
     edges.set(d, to);
   }
-  world = { rulesNames, edges };
+  world = { edges };
   return world;
 };
 
@@ -115,6 +103,8 @@ const insideViolation = (from, to, target, typeOnly) => {
   if (to.kind === "index")
     return "A domain's own files import each other directly; index.ts is for other domains and the routes";
   if (from.kind === "index") {
+    if (to.kind === "rules")
+      return "index.ts does not export rules: rules.ts is read directly, by anyone";
     if (to.kind === "mutations")
       return "index.ts does not export mutations: other domains write through a usecase";
     if (to.kind === "usecases-shared")
@@ -157,7 +147,7 @@ const violationOf = (from, fromRel, target, typeOnly, names, root) => {
   if (from.kind === "route" && !typeOnly && (isPkg(target, "drizzle-orm") || toDb))
     return "A route does not touch the database: read through a domain's queries, write through its usecases";
   if (from.kind === "index" && (target.pkg || !to || to.domain !== fromDomain))
-    return "index.ts only re-exports its own domain's rules, queries and usecases";
+    return "index.ts only re-exports its own domain's queries and usecases";
 
   if (to?.kind === "route" && from.kind !== "route")
     return "Nothing outside src/routes imports a route";
@@ -172,29 +162,26 @@ const violationOf = (from, fromRel, target, typeOnly, names, root) => {
 
   if (!to?.domain) return null;
 
+  if (fromRel.startsWith("src/lib/"))
+    return "src/lib is the shared place below every domain: it imports no domain. What needs a domain's words goes in that domain";
+
   // 同じドメインの中
   if (to.domain === fromDomain) return insideViolation(from, to, target, typeOnly);
 
-  // 他のドメイン、または routes・db・main.ts から
-  if (to.kind !== "index")
-    return `Another domain is read only through its index.ts: import from "#/domains/${to.domain}/index"`;
+  // 他のドメイン、または routes・db・main.ts から。読めるのは index.ts（queries・usecases）と rules.ts だけ
+  if (to.kind !== "index" && to.kind !== "rules")
+    return `Another domain is read only through its index.ts (queries, usecases) or its rules.ts: import from "#/domains/${to.domain}/index" or "#/domains/${to.domain}/rules"`;
 
-  const { rulesNames, edges } = worldOf(root);
-  const onlyRules =
-    from.kind === "rules" ||
-    from.kind === "queries" ||
-    from.kind === "mutations" ||
-    fromRel.startsWith("src/db/");
-  if (onlyRules) {
-    const rules = rulesNames.get(to.domain) ?? new Set();
-    const notRules = names.filter((n) => !rules.has(n));
-    if (notRules.length > 0) {
-      const where = fromRel.startsWith("src/db/") ? "src/db" : `${from.kind}.ts`;
-      return `${where} takes only rules from another domain (${notRules.join(", ")} is not in ${to.domain}/rules.ts). Combine reads and writes of several domains in a usecase`;
-    }
+  if (to.kind === "index") {
+    // index.ts は queries を公開する。queries より下にいるものが読むと、上の層を引き込んで循環する
+    if (from.kind === "rules" || fromRel.startsWith("src/db/"))
+      return `${from.kind === "rules" ? "rules.ts" : "src/db"} reads another domain's rules only: import from "#/domains/${to.domain}/rules"`;
+    if (from.kind === "queries" || from.kind === "mutations")
+      return `${from.kind}.ts reads another domain's rules only ("#/domains/${to.domain}/rules"). Combine reads and writes of several domains in a usecase`;
   }
 
   if (fromDomain) {
+    const { edges } = worldOf(root);
     const circle = pathBetween(edges, to.domain, fromDomain);
     if (circle)
       return `Domains may not depend on each other in a circle: ${[fromDomain, ...circle].join(" → ")}. Something sits in the wrong domain: move what both need to where both can read it one way`;

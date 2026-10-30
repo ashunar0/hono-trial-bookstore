@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createEndpoint, errorResponses, NotFound } from "hono-kit";
 import { requireRole } from "#/auth";
-import { quantitySchema, setStock, StockChanged } from "#/domains/inventory/index";
+import { setStock } from "#/domains/inventory/index";
+import { quantitySchema, StockChanged } from "#/domains/inventory/rules";
 import { stockResponseSchema } from "../../_response";
 
 /** Staff set the count. version is the one read with GET /books/:id (0 when the book has never had stock) */
