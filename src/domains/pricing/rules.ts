@@ -34,3 +34,23 @@ export const estimate = (
     applied !== null && "reason" in applied ? applied.reason : null;
   return { subtotal, discount, shippingFee: shipping, total, tax, notApplicable };
 };
+
+/**
+ * The cart at today's prices, and its estimate. The cart's GET and placing an order both read the same three
+ * things and call this, so what the customer sees is what they pay. A book gone from the shop drops its line
+ */
+export const priceCart = (
+  items: { bookId: string; quantity: number }[],
+  books: { id: string; title: string; price: number }[],
+  asked: { coupon: CouponTerms | undefined } | null,
+  now: Date,
+) => {
+  const byId = new Map(books.map((b) => [b.id, b]));
+  const lines = items.flatMap((item) => {
+    const book = byId.get(item.bookId);
+    return book === undefined
+      ? []
+      : [{ bookId: book.id, title: book.title, unitPrice: book.price, quantity: item.quantity }];
+  });
+  return { lines, ...estimate(lines, asked, now) };
+};
