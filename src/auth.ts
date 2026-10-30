@@ -4,6 +4,16 @@
  */
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
+import { createMiddleware } from "hono/factory";
+import {
+  type CurrentUser,
+  type DepsVariables,
+  fail,
+  Forbidden,
+  getCurrentUser,
+  guard,
+  Unauthorized,
+} from "hono-kit";
 import { wireDb } from "./db/index";
 import { account, roles, session, user, verification } from "./db/auth-schema";
 
@@ -30,3 +40,21 @@ export const sessionUserOf = (auth: ReturnType<typeof makeAuth>) => async (heade
   const { id, name, email, role } = found.user;
   return { id, name, email, role };
 };
+
+/**
+ * Requires sign-in with this role: `auth: requireRole("staff")`. 401 signed out, 403 another role.
+ * Only for a permission the role alone decides; one that needs the row is checked in code after reading it
+ */
+export const requireRole = (role: (typeof roles)[number]) =>
+  guard(
+    [Unauthorized, Forbidden],
+    createMiddleware<{ Variables: { currentUser: CurrentUser } & DepsVariables }>(
+      async (c, next) => {
+        const user = await getCurrentUser(c);
+        if (user === null) throw fail(Unauthorized);
+        if (user.role !== role) throw fail(Forbidden);
+        c.set("currentUser", user);
+        await next();
+      },
+    ),
+  );

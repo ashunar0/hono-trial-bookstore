@@ -17,6 +17,12 @@ export const bob: SessionUser = {
   email: "bob@example.com",
   role: "customer",
 };
+export const carol: SessionUser = {
+  id: "carol",
+  name: "Carol",
+  email: "carol@example.com",
+  role: "staff",
+};
 
 /**
  * A new user nobody else has used. The tests in a file share one D1, so a test that reads a list
