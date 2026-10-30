@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { createEndpoint } from "hono-kit";
 import { requireRole } from "#/auth";
-import { cartResponseSchema, readCart } from "./_cart";
+import { readCart } from "./_read";
+import { cartResponseSchema } from "./_response";
 
 /** ?coupon=SPRING500 tries a coupon. One that does not apply is not a failure here: the estimate says why */
 export const GET = createEndpoint(

@@ -3,7 +3,8 @@ import { createEndpoint, errorResponses, NotFound } from "hono-kit";
 import { requireRole } from "#/auth";
 import { removeCartItem, setCartItem } from "#/domains/cart/index";
 import { cartQuantitySchema } from "#/domains/cart/rules";
-import { cartResponseSchema, readCart } from "../../_cart";
+import { readCart } from "../../_read";
+import { cartResponseSchema } from "../../_response";
 
 const param = z.object({ bookId: z.string() });
 

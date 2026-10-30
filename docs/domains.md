@@ -2,7 +2,7 @@
 
 <!-- The original of this page and lint/domains.mjs is ~/dev/hono/hono-trials/kakeibo. Other projects copy both from there: change them there first, then copy again. -->
 
-The business rules live in `src/domains/<noun>/`, outside the routes. Every domain has the same kinds of file, and **what a file imports decides which kind it is**, so where a function goes is never a judgment of size. Between domains the rules are those of a modular monolith: one app and one database, split into domains that touch each other only through what each one publishes. `lint/domains.mjs` (rule `domains/imports`) stops an import that breaks the tables below.
+The business rules live in `src/domains/<noun>/`, outside the routes. Every domain draws from the same list of file kinds below, and **what a file imports decides which kind it is**, so where a function goes is never a judgment of size. Between domains the rules are those of a modular monolith: one app and one database, split into domains that touch each other only through what each one publishes. `lint/domains.mjs` (rule `domains/imports`) stops an import that breaks the tables below.
 
 ```
 src/domains/<noun>/
@@ -14,6 +14,8 @@ src/domains/<noun>/
   usecases/_<name>.ts # a part two usecases of this domain share (usecases/_withinBudget.ts)
 ```
 
+A domain has only the kinds it has something to put in: no empty files (a domain of values alone has only `rules.ts`). The list is fixed: no other kind of file is added to a domain. Each kind has the same role and rules in every domain.
+
 ## Inside a domain: where a function goes
 
 1. Needs no database, no deps, no HTTP → `rules.ts`
@@ -22,6 +24,17 @@ src/domains/<noun>/
 4. Anything else (reads and writes, reads another domain, uses deps, decides from what it read) → `usecases/<verb>.ts`, in the domain that owns the table it writes
 
 A read that needs several domains and writes nothing (a list with a flag from another domain, a summary) is put together in the route: it calls each domain's queries and combines the results. It is not a usecase, since a usecase is for a write.
+
+What goes in `queries.ts` is decided by what the domain needs, not by what a response needs. Reading an order with its returns and refunds together belongs there when a usecase decides from it (how much can still be refunded); when only a response shows them together, it does not.
+
+### Reads that make a response: `_read.ts`
+
+When several endpoints of a resource return the same shape and making it takes more than one read (an order with its lines, returns and refunds; a cart with its books and an estimate), the reads go in that resource's `src/routes/<noun>/_read.ts`:
+
+- It calls queries (and plain functions of rules, such as a price estimate) and returns the shape of `_response.ts`. It writes nothing
+- It takes the db as an argument, so an endpoint that has just written reads what it wrote
+- Only the routes of its own resource use it. Another resource reads only `_response.ts`, as before
+- An endpoint that needs a single read to make its response does it in place, without a `_read.ts`
 
 ## Between domains
 

@@ -1,38 +1,10 @@
-import { z } from "zod";
 import type { UserId } from "hono-kit";
 import type { Db } from "#/db/index";
 import { findBooks } from "#/domains/book/index";
 import { cartItemsOf } from "#/domains/cart/index";
 import { findCouponByCode } from "#/domains/coupon/index";
-import { notApplicableReasons } from "#/domains/coupon/rules";
 import { estimate } from "#/domains/pricing/rules";
-
-/** GET /cart, and what PUT /cart/items/:bookId returns */
-export const cartResponseSchema = z.object({
-  items: z.array(
-    z.object({
-      bookId: z.string(),
-      title: z.string(),
-      /** Yen, tax included, as the book is priced now */
-      unitPrice: z.number(),
-      quantity: z.number(),
-    }),
-  ),
-  subtotal: z.number(),
-  discount: z.number(),
-  shippingFee: z.number(),
-  total: z.number(),
-  /** The tax within total */
-  tax: z.number(),
-  /** The coupon tried with ?coupon=. Not applied: discount is 0 and reason says why */
-  coupon: z
-    .object({
-      code: z.string(),
-      applied: z.boolean(),
-      reason: z.enum(notApplicableReasons).nullable(),
-    })
-    .nullable(),
-});
+import type { CartResponse } from "./_response";
 
 /** The cart with today's prices, and the estimate with the coupon tried (if any) */
 export const readCart = async (
@@ -40,7 +12,7 @@ export const readCart = async (
   customerId: UserId,
   couponCode: string | undefined,
   now: Date,
-): Promise<z.infer<typeof cartResponseSchema>> => {
+): Promise<CartResponse> => {
   const items = await cartItemsOf(db, customerId);
   const books = new Map(
     (
