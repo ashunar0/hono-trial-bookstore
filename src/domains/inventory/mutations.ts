@@ -1,4 +1,5 @@
 import { and, eq, exists, sql } from "drizzle-orm";
+import { updateWithVersion } from "hono-kit/sqlite";
 import type { Db } from "#/db/index";
 import {
   reservationLinesTable,
@@ -12,20 +13,12 @@ import {
 export const insertStock = (db: Db, row: typeof stocksTable.$inferInsert) =>
   db.insert(stocksTable).values(row).onConflictDoNothing().returning();
 
-/**
- * No row back when the version is no longer the one read.
- * By hand, not updateWithVersion: that needs an `id` column, and this table's key is the book's id
- */
+/** No row back when the version is no longer the one read */
 export const updateStock = (
   db: Db,
   at: { bookId: string; version: number },
   values: { quantity: number; updatedAt: Date },
-) =>
-  db
-    .update(stocksTable)
-    .set({ ...values, version: sql`${stocksTable.version} + 1` })
-    .where(and(eq(stocksTable.bookId, at.bookId), eq(stocksTable.version, at.version)))
-    .returning();
+) => updateWithVersion(db, stocksTable, at, values);
 
 type Held = { bookId: string; quantity: number };
 
