@@ -18,8 +18,8 @@ importers:
         specifier: ^4.13.1
         version: 4.13.14
       hono-kit:
-        specifier: ^0.16.0
-        version: 0.16.0(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261029.1)(kysely@0.29.7))(hono@4.13.14)
+        specifier: ^0.17.0
+        version: 0.17.0(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261029.1)(kysely@0.29.7))(hono@4.13.14)
       zod:
         specifier: ^4.4.3
         version: 4.6.7
@@ -1618,8 +1618,8 @@ packages:
   get-tsconfig@4.14.3:
     resolution: {integrity: sha512-++QEw4DIY7WGoukz+/+A/8dGYPT9l9yIadnmSgZ8Rjr3YVSVDipQSO9CdnJo9ePqFqUUqh+wk9uIaoiAwsiPkA==}
 
-  hono-kit@0.16.0:
-    resolution: {integrity: sha512-/YOXLOeNQJN9QsZRCQ0cxzxIzjjCE+30l7xOUaHhlXtC7Ugm/brOl9GaaIKqBmwZjDzorvAeEePjVh+ax59H2A==}
+  hono-kit@0.17.0:
+    resolution: {integrity: sha512-a6xrvmdTM4MaYH8jHPzuHEX0ZC7c9AvYZPrC0Hrv1qz74in1O5h7LRE8z08K7p9ixBGx5e50hllGHSwCPqpZKA==}
     hasBin: true
     peerDependencies:
       drizzle-orm: '>=0.45.0'
@@ -2928,7 +2928,7 @@ snapshots:
     dependencies:
       resolve-pkg-maps: 1.0.0
 
-  hono-kit@0.16.0(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261029.1)(kysely@0.29.7))(hono@4.13.14):
+  hono-kit@0.17.0(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261029.1)(kysely@0.29.7))(hono@4.13.14):
     dependencies:
       hono: 4.13.14
       oxc-parser: 0.155.0

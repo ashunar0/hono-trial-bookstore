@@ -16,9 +16,9 @@ import {
   stockOf,
   type Order,
 } from "../routes/orders/_test-helpers";
-import { sweepOrders } from "./sweepOrders";
+import { cron } from "./sweep-orders";
 
-const sweep = (now: Date) => sweepOrders({ deps: makeDeps(env), now });
+const sweep = (now: Date) => cron.run({ deps: makeDeps(env), now });
 
 const statusOf = async (id: string) => {
   const [row] = await db().select().from(ordersTable).where(eq(ordersTable.id, id));
@@ -159,7 +159,7 @@ it("one order that fails does not stop the others, and the run still fails so it
   });
 
   await expect(
-    sweepOrders({ deps: { ...real, db }, now: new Date("2026-11-18T10:15:00+09:00") }),
+    cron.run({ deps: { ...real, db }, now: new Date("2026-11-18T10:15:00+09:00") }),
   ).rejects.toThrow("boom");
 
   const statuses = [(await statusOf(one.id))?.status, (await statusOf(two.id))?.status].sort();
