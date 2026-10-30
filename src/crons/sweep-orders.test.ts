@@ -15,9 +15,9 @@ import {
   stockOf,
   type Order,
 } from "../routes/orders/_test-helpers";
-import { sweepOrders } from "./sweepOrders";
+import { cron } from "./sweep-orders";
 
-const sweep = (now: Date) => sweepOrders({ deps: makeDeps(), now });
+const sweep = (now: Date) => cron.run({ deps: makeDeps(), now });
 
 const statusOf = async (id: string) => {
   const [row] = await db().select().from(ordersTable).where(eq(ordersTable.id, id));

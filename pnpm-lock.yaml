@@ -17,9 +17,6 @@ importers:
       better-auth:
         specifier: 1.7.14
         version: 1.7.14(drizzle-kit@0.31.11)(drizzle-orm@0.45.4(@cloudflare/workers-types@5.20261029.1)(@libsql/client@0.18.0)(kysely@0.29.7))(vitest@4.1.12(@types/node@26.6.6)(vite@8.3.5(@types/node@26.6.6)(esbuild@0.28.2)(tsx@4.23.15)))
-      croner:
-        specifier: ^11.0.0
-        version: 11.0.0
       drizzle-orm:
         specifier: ^0.45.2
         version: 0.45.4(@cloudflare/workers-types@5.20261029.1)(@libsql/client@0.18.0)(kysely@0.29.7)
@@ -29,6 +26,9 @@ importers:
       hono-kit:
         specifier: link:/Users/a.kawanobe/dev/hono/hono-kit/packages/hono-kit
         version: link:../../hono-kit/packages/hono-kit
+      hono-kit-node:
+        specifier: link:/Users/a.kawanobe/dev/hono/hono-kit/packages/hono-kit-node
+        version: link:../../hono-kit/packages/hono-kit-node
       zod:
         specifier: ^4.4.3
         version: 4.6.7
@@ -1173,10 +1173,6 @@ packages:
   convert-source-map@2.0.0:
     resolution: {integrity: sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg==}
 
-  croner@11.0.0:
-    resolution: {integrity: sha512-T17ADjdttrVToyzLpLq9Xb9xzcMwpQ/M3Qs9szhh0MVNTbv6NWQ9OFYa2qlzPYXFMn+uoDlnW1IpIv6cAvFtyA==}
-    engines: {node: '>=18.0'}
-
   defu@6.1.7:
     resolution: {integrity: sha512-7z22QmUWiQ/2d0KkdYmANbRUVABpZ9SNYyH5vx6PZ+nE5bcC0l7uFvEfHlyld/HcGBFTL536ClDt3DEcSlEJAQ==}
 
@@ -2290,8 +2286,6 @@ snapshots:
   chai@6.3.0: {}
 
   convert-source-map@2.0.0: {}
-
-  croner@11.0.0: {}
 
   defu@6.1.7: {}
 

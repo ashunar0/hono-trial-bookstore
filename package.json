@@ -8,7 +8,7 @@
   },
   "scripts": {
     "postinstall": "hnk prepare",
-    "dev": "hnk prepare && tsx watch src/server.ts",
+    "dev": "node scripts/dev.mjs",
     "start": "tsx src/server.ts",
     "typecheck": "tsc --noEmit",
     "lint": "oxlint --type-aware .",
@@ -23,10 +23,10 @@
     "@hono/node-server": "^2.1.5",
     "@libsql/client": "^0.18.0",
     "better-auth": "1.7.14",
-    "croner": "^11.0.0",
     "drizzle-orm": "^0.45.2",
     "hono": "^4.13.1",
     "hono-kit": "link:/Users/a.kawanobe/dev/hono/hono-kit/packages/hono-kit",
+    "hono-kit-node": "link:/Users/a.kawanobe/dev/hono/hono-kit/packages/hono-kit-node",
     "zod": "^4.4.3"
   },
   "devDependencies": {
