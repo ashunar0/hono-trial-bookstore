@@ -15,8 +15,8 @@ const fixed = (code = newCode()) => ({
   endsAt: "2026-12-01T00:00:00+09:00",
 });
 
-const create = async (input: unknown) => {
-  const res = await request(carol, "POST", "/coupons", input);
+const create = async (input: unknown, at?: Date) => {
+  const res = await request(carol, "POST", "/coupons", input, at);
   expect(res.status).toBe(200);
   return (await res.json()) as Coupon;
 };
@@ -93,8 +93,9 @@ it("answers 404 when stopping a coupon that does not exist", async () => {
 });
 
 it("lists newest first, stopped ones too", async () => {
-  const older = await create(fixed());
-  const newer = await create(fixed());
+  // Two creates can land in the same millisecond, so the order would come down to the random id
+  const older = await create(fixed(), new Date("2026-10-01T00:00:00Z"));
+  const newer = await create(fixed(), new Date("2026-10-02T00:00:00Z"));
   await request(carol, "POST", `/coupons/${newer.id}/stop`);
 
   const res = await request(carol, "GET", "/coupons?limit=100");
