@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers";
 import type { SessionUser } from "hono-kit";
 import { expect, it } from "vitest";
 import { requireRole } from "#/auth";
@@ -8,7 +7,7 @@ import { alice, appAs, carol } from "./fixtures";
 const call = (user: SessionUser | null) => {
   const app = appAs(user);
   app.get("/staff-only", requireRole("staff"), (c) => c.json({ id: c.var.currentUser.id }));
-  return app.request("/staff-only", {}, env);
+  return app.request("/staff-only");
 };
 
 it("lets the role through, with currentUser set", async () => {

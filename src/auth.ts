@@ -1,6 +1,7 @@
 /**
  * The auth provider (Better Auth, email and password). It owns the user, session, account and verification tables
- * and the routes under /api/auth. Built per request from env, like deps: the D1 binding is only there in a request
+ * and the routes under /api/auth. Built once at startup with the database, like deps.
+ * Better Auth reads BETTER_AUTH_SECRET and BETTER_AUTH_URL from the environment itself
  */
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
@@ -14,17 +15,15 @@ import {
   guard,
   Unauthorized,
 } from "hono-kit";
-import { wireDb } from "./db/index";
+import type { Db } from "./db/index";
 import { account, roles, session, user, verification } from "./db/auth-schema";
 
-export const makeAuth = (env: Env) =>
+export const makeAuth = (db: Db) =>
   betterAuth({
-    database: drizzleAdapter(wireDb(env.DB), {
+    database: drizzleAdapter(db, {
       provider: "sqlite",
       schema: { user, session, account, verification },
     }),
-    secret: env.BETTER_AUTH_SECRET,
-    baseURL: env.BETTER_AUTH_URL,
     // input: false, so a role sent on sign-up is ignored and everyone starts as a customer
     user: {
       additionalFields: { role: { type: [...roles], defaultValue: "customer", input: false } },

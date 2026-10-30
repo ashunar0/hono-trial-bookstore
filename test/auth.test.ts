@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { user } from "#/db/schema";
@@ -9,15 +8,11 @@ import { db } from "./fixtures";
 const app = () => buildApp(makeDeps);
 
 const signUp = async (email: string, extra: Record<string, unknown> = {}) => {
-  const res = await app().request(
-    "/api/auth/sign-up/email",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password: "correct horse battery", name: "me", ...extra }),
-    },
-    env,
-  );
+  const res = await app().request("/api/auth/sign-up/email", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password: "correct horse battery", name: "me", ...extra }),
+  });
   expect(res.status).toBe(200);
   // "better-auth.session_token=...; Path=/; HttpOnly" → the name=value pair a browser sends back
   const [pair] = (res.headers.get("Set-Cookie") ?? "").split(";");
@@ -29,13 +24,13 @@ it("anyone can sign up, and the session cookie reads back as that account", asyn
   const email = `${crypto.randomUUID()}@example.com`;
   const cookie = await signUp(email);
 
-  const signedIn = await makeDeps(env).sessionUser(new Headers({ Cookie: cookie }));
+  const signedIn = await makeDeps().sessionUser(new Headers({ Cookie: cookie }));
 
   expect(signedIn).toMatchObject({ email, role: "customer" });
 });
 
 it("a made-up cookie is signed out", async () => {
-  const signedIn = await makeDeps(env).sessionUser(
+  const signedIn = await makeDeps().sessionUser(
     new Headers({ Cookie: "better-auth.session_token=forged" }),
   );
 

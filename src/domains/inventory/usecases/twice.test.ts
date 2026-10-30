@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers";
 import { expect, it } from "vitest";
 import { makeDeps } from "#/main";
 import { carol, request } from "../../../../test/fixtures";
@@ -16,10 +15,10 @@ const bookWith = async (stock: number) => {
 };
 
 const quantityOf = async (bookId: string) =>
-  (await stocksOf(makeDeps(env).db, [bookId])).get(bookId)?.quantity;
+  (await stocksOf(makeDeps().db, [bookId])).get(bookId)?.quantity;
 
 it("holding twice with the same id holds once", async () => {
-  const deps = makeDeps(env);
+  const deps = makeDeps();
   const book = await bookWith(5);
   const hold = { reservationId: crypto.randomUUID(), lines: [{ bookId: book, quantity: 2 }], now };
 
@@ -30,7 +29,7 @@ it("holding twice with the same id holds once", async () => {
 });
 
 it("giving back twice gives back once", async () => {
-  const deps = makeDeps(env);
+  const deps = makeDeps();
   const book = await bookWith(5);
   const reservationId = crypto.randomUUID();
   await reserveStock(deps, { reservationId, lines: [{ bookId: book, quantity: 2 }], now });
@@ -42,7 +41,7 @@ it("giving back twice gives back once", async () => {
 });
 
 it("giving back a hold never made changes nothing (the placing stopped before it)", async () => {
-  const deps = makeDeps(env);
+  const deps = makeDeps();
   const book = await bookWith(5);
 
   await releaseReservation(deps, { reservationId: crypto.randomUUID(), now });

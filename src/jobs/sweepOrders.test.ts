@@ -1,4 +1,3 @@
-import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { ordersTable, returnsTable } from "#/db/schema";
@@ -18,7 +17,7 @@ import {
 } from "../routes/orders/_test-helpers";
 import { sweepOrders } from "./sweepOrders";
 
-const sweep = (now: Date) => sweepOrders({ deps: makeDeps(env), now });
+const sweep = (now: Date) => sweepOrders({ deps: makeDeps(), now });
 
 const statusOf = async (id: string) => {
   const [row] = await db().select().from(ordersTable).where(eq(ordersTable.id, id));
@@ -76,7 +75,7 @@ it("cancels an order left placing for 10 minutes (the Worker died after holding 
       createdAt: placedAt,
       updatedAt: placedAt,
     });
-  await reserveStock(makeDeps(env), {
+  await reserveStock(makeDeps(), {
     reservationId,
     lines: [{ bookId: book, quantity: 1 }],
     now: placedAt,

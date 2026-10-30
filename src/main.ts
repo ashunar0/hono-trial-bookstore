@@ -1,15 +1,14 @@
 import { createApp } from "hono-kit";
-import { createWorker } from "hono-kit/worker";
 import { makeAuth, sessionUserOf } from "./auth";
 import { wireDb } from "./db/index";
-import { sweepOrders } from "./jobs/sweepOrders";
 import { registerRoutes } from "./routes.gen";
 
-/** What handlers, middleware and jobs read in c.var.deps. Built per request; tests swap parts of it */
-export const makeDeps = (env: Env) => {
-  const auth = makeAuth(env);
-  return { db: wireDb(env.DB), auth, sessionUser: sessionUserOf(auth) };
-};
+/** Opened once when the process starts, and shared by every request. vitest.config.ts points it to :memory: */
+const db = wireDb(process.env.DATABASE_URL ?? "file:data.db");
+const auth = makeAuth(db);
+
+/** What handlers, middleware and jobs read in c.var.deps. Tests swap parts of it */
+export const makeDeps = () => ({ db, auth, sessionUser: sessionUserOf(auth) });
 
 export const buildApp = (deps = makeDeps, clock?: () => Date) => {
   const app = createApp({ makeDeps: deps, clock });
@@ -19,5 +18,3 @@ export const buildApp = (deps = makeDeps, clock?: () => Date) => {
   registerRoutes(app);
   return app;
 };
-
-export default createWorker({ makeDeps, fetch: buildApp().fetch, scheduled: sweepOrders });
