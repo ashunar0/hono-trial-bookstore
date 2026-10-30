@@ -7,6 +7,7 @@ import { releaseReservation, reserveStock } from "#/domains/inventory/index";
 import { estimate } from "#/domains/pricing/rules";
 import { deleteOrder, insertOrder, updateOrder } from "../mutations";
 import { findOrder } from "../queries";
+import { giveBack } from "./_giveBack";
 import { CartEmpty, OrderStatusConflict, allocateDiscount, paymentDueOf } from "../rules";
 
 type Input = { customerId: UserId; couponCode: string | undefined; now: Date };
@@ -107,6 +108,8 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
     { status: "awaiting_payment", updatedAt: now },
   );
   if (placed === undefined) {
+    // The cron cancelled it first. It may have given back before this held or used anything: give back again
+    await giveBack(deps, order, now);
     const current = await findOrder(db, order.id);
     return err({
       code: OrderStatusConflict.code,

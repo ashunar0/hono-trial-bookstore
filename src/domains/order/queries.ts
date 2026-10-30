@@ -1,9 +1,9 @@
-import { and, asc, desc, eq, inArray, lt, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, lt, lte, or } from "drizzle-orm";
 import type { UserId } from "hono-kit";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
 import { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
-import { visibleStatuses } from "./rules";
+import { placingTimeoutMs, visibleStatuses } from "./rules";
 
 /** Any status, placing too: the caller decides what to show */
 export const findOrder = async (db: Db, id: string) => {
@@ -53,3 +53,37 @@ export const refundsOf = (db: Db, orderId: string) =>
     .from(refundsTable)
     .where(eq(refundsTable.orderId, orderId))
     .orderBy(asc(refundsTable.createdAt), asc(refundsTable.id));
+
+/**
+ * What the cron must finish, oldest first, at most `limit` of each: awaiting payment past the deadline,
+ * placing for longer than placingTimeoutMs, and cancelled with the giving back not done
+ */
+export const ordersToSweep = async (db: Db, now: Date, limit: number) => {
+  const pick = { id: ordersTable.id, version: ordersTable.version };
+  const [expired, stuck, unfinished] = await db.batch([
+    db
+      .select(pick)
+      .from(ordersTable)
+      .where(and(eq(ordersTable.status, "awaiting_payment"), lte(ordersTable.paymentDueAt, now)))
+      .orderBy(asc(ordersTable.paymentDueAt))
+      .limit(limit),
+    db
+      .select(pick)
+      .from(ordersTable)
+      .where(
+        and(
+          eq(ordersTable.status, "placing"),
+          lte(ordersTable.createdAt, new Date(now.getTime() - placingTimeoutMs)),
+        ),
+      )
+      .orderBy(asc(ordersTable.createdAt))
+      .limit(limit),
+    db
+      .select(pick)
+      .from(ordersTable)
+      .where(and(eq(ordersTable.status, "cancelled"), isNull(ordersTable.releasedAt)))
+      .orderBy(asc(ordersTable.cancelledAt))
+      .limit(limit),
+  ]);
+  return [...expired, ...stuck, ...unfinished];
+};

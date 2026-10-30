@@ -3,14 +3,18 @@ import type { Db } from "#/db/index";
 import { findOrder } from "../queries";
 import { OrderStatusConflict } from "../rules";
 
+/** Who asks: a customer (their own orders), staff (every order) or the cron (placing ones too) */
+export type By = { customerId: UserId } | "staff" | "cron";
+
 /**
- * The order as `customerId` may see it: their own, and not placing. null is staff, who see every order.
+ * The order as `by` may see it. A placing order is seen only by the cron.
  * Someone else's is undefined, like one that does not exist
  */
-export const findFor = async (db: Db, id: string, customerId: UserId | null) => {
+export const findFor = async (db: Db, id: string, by: By) => {
   const order = await findOrder(db, id);
-  if (order === undefined || order.status === "placing") return undefined;
-  if (customerId !== null && order.customerId !== customerId) return undefined;
+  if (order === undefined) return undefined;
+  if (order.status === "placing" && by !== "cron") return undefined;
+  if (typeof by === "object" && order.customerId !== by.customerId) return undefined;
   return order;
 };
 

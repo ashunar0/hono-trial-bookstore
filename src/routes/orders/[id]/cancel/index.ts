@@ -19,7 +19,7 @@ export const POST = createEndpoint(
     const user = c.var.currentUser;
     const result = await cancelOrder(c.var.deps, {
       id: c.req.valid("param").id,
-      customerId: user.role === "staff" ? null : user.id,
+      by: user.role === "staff" ? "staff" : { customerId: user.id },
       version: c.req.valid("json").version,
       now: c.get("now"),
     });

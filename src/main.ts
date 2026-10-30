@@ -2,6 +2,7 @@ import { createApp } from "hono-kit";
 import { createWorker } from "hono-kit/worker";
 import { makeAuth, sessionUserOf } from "./auth";
 import { wireDb } from "./db/index";
+import { sweepOrders } from "./jobs/sweepOrders";
 import { registerRoutes } from "./routes.gen";
 
 /** What handlers, middleware and jobs read in c.var.deps. Built per request; tests swap parts of it */
@@ -19,4 +20,4 @@ export const buildApp = (deps = makeDeps, clock?: () => Date) => {
   return app;
 };
 
-export default createWorker({ makeDeps, fetch: buildApp().fetch });
+export default createWorker({ makeDeps, fetch: buildApp().fetch, scheduled: sweepOrders });

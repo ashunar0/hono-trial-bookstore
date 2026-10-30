@@ -188,6 +188,8 @@ export const ordersTable = sqliteTable(
     // A customer's list and the staff's list, newest first
     index("orders_customer_created_at").on(t.customerId, t.createdAt, t.id),
     index("orders_created_at").on(t.createdAt, t.id),
+    // What the cron picks up by status
+    index("orders_status").on(t.status, t.paymentDueAt),
   ],
 );
 

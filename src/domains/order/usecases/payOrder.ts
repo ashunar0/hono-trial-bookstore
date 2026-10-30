@@ -11,7 +11,7 @@ type Input = { customerId: UserId; id: string; now: Date };
  */
 export const payOrder = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
-  const order = await findFor(db, input.id, input.customerId);
+  const order = await findFor(db, input.id, { customerId: input.customerId });
   if (order === undefined) return err(NotFound.code);
   if (input.now >= order.paymentDueAt) return err(PaymentDeadlinePassed.code);
   if (!canPay(order.status))

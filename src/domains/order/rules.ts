@@ -58,3 +58,6 @@ export const PaymentDeadlinePassed = {
   kind: "unprocessable",
   message: "The payment deadline has passed (the order is cancelled soon, if it is not yet)",
 } as const;
+
+/** A placing order older than this stopped halfway: the cron cancels it */
+export const placingTimeoutMs = 10 * 60 * 1000;
