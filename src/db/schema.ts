@@ -3,7 +3,7 @@
  * Split into files when it grows, and point drizzle.config.ts's schema at them
  */
 import { sql } from "drizzle-orm";
-import { check, index, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { check, index, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { couponKinds } from "#/domains/coupon/rules";
 
 export * from "./auth-schema";
@@ -73,5 +73,25 @@ export const couponsTable = sqliteTable(
     check("coupons_ends_after_starts", sql`${t.endsAt} > ${t.startsAt}`),
     // The list, newest first
     index("coupons_created_at").on(t.createdAt, t.id),
+  ],
+);
+
+// ── cart ──
+
+/** One line per book. How many is set, not added to (PUT /cart/items/:bookId) */
+export const cartItemsTable = sqliteTable(
+  "cart_items",
+  {
+    customerId: text("customer_id").notNull(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => booksTable.id),
+    quantity: integer("quantity").notNull(),
+    /** When it was first put in: the cart lists in that order */
+    addedAt: integer("added_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.customerId, t.bookId] }),
+    check("cart_items_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );

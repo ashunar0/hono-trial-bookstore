@@ -1,4 +1,4 @@
-import { and, desc, eq, lt, or } from "drizzle-orm";
+import { and, desc, eq, inArray, lt, or } from "drizzle-orm";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
 import { booksTable } from "#/db/schema";
@@ -26,3 +26,9 @@ export const findBook = async (db: Db, id: string) => {
   const [row] = await db.select().from(booksTable).where(eq(booksTable.id, id)).limit(1);
   return row;
 };
+
+/** The books asked for that exist, in no order */
+export const findBooks = (db: Db, ids: string[]) =>
+  ids.length === 0
+    ? Promise.resolve([])
+    : db.select().from(booksTable).where(inArray(booksTable.id, ids));

@@ -39,3 +39,50 @@ export const CouponCodeTaken = {
   kind: "conflict",
   message: "Another coupon has this code",
 } as const;
+
+/** What deciding a discount needs of a coupon */
+export type CouponTerms = {
+  kind: (typeof couponKinds)[number];
+  value: number;
+  minSubtotal: number;
+  startsAt: Date;
+  endsAt: Date;
+  stoppedAt: Date | null;
+};
+
+export const notApplicableReasons = [
+  "not_found",
+  "not_started",
+  "ended",
+  "stopped",
+  "below_minimum",
+] as const;
+
+export type NotApplicableReason = (typeof notApplicableReasons)[number];
+
+export const CouponNotApplicable = {
+  code: "COUPON_NOT_APPLICABLE",
+  kind: "unprocessable",
+  message: "This coupon cannot be used for this order",
+  details: z.object({ reason: z.enum(notApplicableReasons) }),
+} as const;
+
+/**
+ * How much the coupon takes off the books' subtotal at `now`, or why it does not apply.
+ * undefined is a code that matches no coupon. Usable from startsAt until (not including) endsAt.
+ * A percent discount drops the fraction of a yen
+ */
+export const discountOf = (
+  coupon: CouponTerms | undefined,
+  subtotal: number,
+  now: Date,
+): { discount: number } | { reason: NotApplicableReason } => {
+  if (coupon === undefined) return { reason: "not_found" };
+  if (coupon.stoppedAt !== null) return { reason: "stopped" };
+  if (now < coupon.startsAt) return { reason: "not_started" };
+  if (now >= coupon.endsAt) return { reason: "ended" };
+  if (subtotal < coupon.minSubtotal) return { reason: "below_minimum" };
+  const discount =
+    coupon.kind === "fixed" ? coupon.value : Math.floor((subtotal * coupon.value) / 100);
+  return { discount };
+};
