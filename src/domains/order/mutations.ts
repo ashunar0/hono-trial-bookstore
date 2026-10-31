@@ -37,10 +37,3 @@ export const markRestored = (db: Db, id: string, at: Date) =>
     .update(ordersTable)
     .set({ restoredAt: at })
     .where(and(eq(ordersTable.id, id), isNull(ordersTable.restoredAt)));
-
-/** Records that the points of a closed order are earned. Not a change anyone sees, so the version stays */
-export const markPointsEarned = (db: Db, id: string, at: Date) =>
-  db
-    .update(ordersTable)
-    .set({ pointsEarnedAt: at })
-    .where(and(eq(ordersTable.id, id), isNull(ordersTable.pointsEarnedAt)));

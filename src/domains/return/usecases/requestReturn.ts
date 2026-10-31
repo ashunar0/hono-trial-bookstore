@@ -1,14 +1,15 @@
 import { err, NotFound, ok, type DepsVariables, type UserId } from "hono-kit";
-import { findOrderFor, linesOf, touchOrder } from "#/domains/order/index";
+import { findOrderFor, linesOf } from "#/domains/order/index";
 import { OrderStatusConflict } from "#/domains/order/rules";
 import { insertReturn } from "../mutations";
-import { returnedCopies } from "../queries";
+import { findWindow, returnedCopies } from "../queries";
 import {
   returnableOf,
   returnDeadlineOf,
   ReturnPeriodEnded,
   ReturnQuantityExceeded,
 } from "../rules";
+import { advanceWindow } from "./_advanceWindow";
 
 type Input = {
   customerId: UserId;
@@ -21,7 +22,7 @@ type Input = {
  * The customer asks to send books of a shipped order back. Nothing is refunded until staff receive them.
  * 404 (the order, or a line not in it) → not shipped 409 → past 14 days 422 → more copies than are left 409.
  * Requested and completed returns count against the copies; rejected ones do not.
- * The order's version moves first, and only the one that moved it writes its return: of two requests at once one
+ * The order's return window moves first, and only the one that moved it writes its return: of two requests at once one
  * loses (409) instead of both counting the same copies, and the loser writes nothing it would have to take back
  */
 export const requestReturn = async (deps: DepsVariables["deps"], input: Input) => {
@@ -34,6 +35,8 @@ export const requestReturn = async (deps: DepsVariables["deps"], input: Input) =
     return err({ code: OrderStatusConflict.code, details: { status: order.status } });
   if (input.now > returnDeadlineOf(order.shippedAt)) return err(ReturnPeriodEnded.code);
 
+  // Read before the copies are counted: the move below fails if anything was asked after this
+  const window = await findWindow(db, order.id);
   const counted = await returnedCopies(db, order.id, ["requested", "completed"]);
   const left = input.lines.map((line) => ({
     orderLineId: line.orderLineId,
@@ -52,10 +55,14 @@ export const requestReturn = async (deps: DepsVariables["deps"], input: Input) =
     requestedAt: input.now,
     version: 1,
   };
-  const moved = await touchOrder(deps, { id: order.id, version: order.version, now: input.now });
+  const moved = await advanceWindow(deps, {
+    orderId: order.id,
+    version: window?.version ?? 0,
+    now: input.now,
+  });
   // Another request (or a change) got in after the read
   if (!moved.ok) return moved;
-  // If this stops here, only the version moved: the customer asks again
+  // If this stops here, only the window moved: the customer asks again
   await db.batch(
     insertReturn(
       db,

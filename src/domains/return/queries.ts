@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, inArray, isNull, lt, ne, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
-import { returnLinesTable, returnsTable } from "#/db/schema";
+import { returnLinesTable, returnsTable, returnWindowsTable } from "#/db/schema";
 import type { ReturnStatus } from "./rules";
 
 export const findReturn = async (db: Db, id: string) => {
@@ -98,3 +98,39 @@ export const orderIdsWithUnsettledReturn = async (db: Db, orderIds: string[]) =>
     );
   return new Set(rows.map((row) => row.orderId));
 };
+
+/** The return window of an order. None yet reads as version 0 (see returnWindowsTable) */
+export const findWindow = async (db: Db, orderId: string) => {
+  const [row] = await db
+    .select()
+    .from(returnWindowsTable)
+    .where(eq(returnWindowsTable.orderId, orderId))
+    .limit(1);
+  return row;
+};
+
+/** Of these orders, the ones whose points are closed already */
+export const orderIdsClosed = async (db: Db, orderIds: string[]) => {
+  if (orderIds.length === 0) return new Set<string>();
+  const rows = await db
+    .select({ orderId: returnWindowsTable.orderId })
+    .from(returnWindowsTable)
+    .where(
+      and(
+        inArray(returnWindowsTable.orderId, orderIds),
+        isNotNull(returnWindowsTable.pointsClosedAt),
+      ),
+    );
+  return new Set(rows.map((row) => row.orderId));
+};
+
+/** Windows closed whose points are not earned yet (the cron finishes them), oldest first */
+export const windowsToFinish = (db: Db, limit: number) =>
+  db
+    .select({ orderId: returnWindowsTable.orderId })
+    .from(returnWindowsTable)
+    .where(
+      and(isNotNull(returnWindowsTable.pointsClosedAt), isNull(returnWindowsTable.pointsEarnedAt)),
+    )
+    .orderBy(asc(returnWindowsTable.pointsClosedAt))
+    .limit(limit);

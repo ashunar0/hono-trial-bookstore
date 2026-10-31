@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { cron } from "#/crons/sweep-orders";
-import { ordersTable, returnsTable } from "#/db/schema";
+import { returnsTable, returnWindowsTable } from "#/db/schema";
 import { makeDeps } from "#/main";
 import { carol, db, request, someone } from "../../../../test/fixtures";
 import {
@@ -24,9 +24,13 @@ const justAfter = new Date(deadline.getTime() + 1);
 
 const sweep = (now: Date) => cron.run({ deps: makeDeps(env), now });
 
+/** The order's return window; none yet is version 0 with nothing closed */
 const rowOf = async (id: string) => {
-  const [row] = await db().select().from(ordersTable).where(eq(ordersTable.id, id));
-  return row!;
+  const [row] = await db()
+    .select()
+    .from(returnWindowsTable)
+    .where(eq(returnWindowsTable.orderId, id));
+  return row ?? { pointsClosedAt: null, pointsEarnedAt: null, version: 0 };
 };
 
 const ask = async (who: Parameters<typeof request>[0], order: Order, quantity = 1) =>
@@ -167,7 +171,10 @@ it("a close that stopped before earning is finished by the cron, and the points 
   const order = await shippedOrder(me);
   await sweep(justAfter);
   // The Worker died after the close and the earning, before the record
-  await db().update(ordersTable).set({ pointsEarnedAt: null }).where(eq(ordersTable.id, order.id));
+  await db()
+    .update(returnWindowsTable)
+    .set({ pointsEarnedAt: null })
+    .where(eq(returnWindowsTable.orderId, order.id));
 
   await sweep(new Date(justAfter.getTime() + 15 * 60 * 1000));
 
@@ -175,7 +182,7 @@ it("a close that stopped before earning is finished by the cron, and the points 
   expect((await rowOf(order.id)).pointsEarnedAt).toEqual(expect.any(Date));
 });
 
-it("a close moves the order's version, so a return that read the order before it loses", async () => {
+it("a close moves the return window's version, so a return that read the window before it loses", async () => {
   const me = someone();
   await put(me, await bookWith(5000, 5), 1);
   const order = await shippedOrder(me);

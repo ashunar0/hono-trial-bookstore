@@ -104,10 +104,10 @@ export const ordersToSweep = async (db: Db, now: Date, limit: number) => {
 };
 
 /**
- * Shipped orders shipped before `before` that earn points and whose points are not closed yet, oldest first, `limit`
- * of them after `after`. Whether a return is waiting is return's to say
+ * Shipped orders that earn points and were shipped before `before`, oldest first, `limit` of them after `after`.
+ * Whether their return window is closed, or a return is waiting, is return's to say
  */
-export const shippedOrdersToClose = (
+export const shippedOrdersEarning = (
   db: Db,
   input: { before: Date; after?: { at: Date; id: string }; limit: number },
 ) =>
@@ -118,7 +118,6 @@ export const shippedOrdersToClose = (
       and(
         eq(ordersTable.status, "shipped"),
         isNotNull(ordersTable.earnId),
-        isNull(ordersTable.pointsClosedAt),
         lt(ordersTable.shippedAt, input.before),
         input.after === undefined
           ? undefined
@@ -130,12 +129,3 @@ export const shippedOrdersToClose = (
     )
     .orderBy(asc(ordersTable.shippedAt), asc(ordersTable.id))
     .limit(input.limit);
-
-/** Orders whose points are closed and not earned yet (the cron finishes them), oldest first */
-export const closedOrdersToFinish = (db: Db, limit: number) =>
-  db
-    .select({ id: ordersTable.id })
-    .from(ordersTable)
-    .where(and(isNotNull(ordersTable.pointsClosedAt), isNull(ordersTable.pointsEarnedAt)))
-    .orderBy(asc(ordersTable.pointsClosedAt))
-    .limit(limit);

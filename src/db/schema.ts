@@ -244,10 +244,6 @@ export const ordersTable = sqliteTable(
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     /** When a cancel finished giving back the stock, the coupon and the points. Null on a cancelled order: the cron finishes it */
     restoredAt: integer("restored_at", { mode: "timestamp_ms" }),
-    /** When the points to earn were closed: the return period is over and no return is waiting. Set once */
-    pointsClosedAt: integer("points_closed_at", { mode: "timestamp_ms" }),
-    /** When the points were earned after closing. Null on a closed order: the cron finishes it */
-    pointsEarnedAt: integer("points_earned_at", { mode: "timestamp_ms" }),
     version: integer("version").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
@@ -344,6 +340,30 @@ export const returnLinesTable = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.returnId, t.orderLineId] }),
     check("return_lines_quantity_positive", sql`${t.quantity} > 0`),
+  ],
+);
+
+/**
+ * The return window of an order: what ends with the return period. Returns and exchanges are asked against it (each
+ * moves its version first, so of two asked at once one loses), and so is the closing of the points. An order with no
+ * row has version 0: the row is made the first time one is asked or the points are closed
+ */
+export const returnWindowsTable = sqliteTable(
+  "return_windows",
+  {
+    orderId: text("order_id")
+      .primaryKey()
+      .references(() => ordersTable.id),
+    /** When the points to earn were closed: the return period is over and nothing is waiting. Set once */
+    pointsClosedAt: integer("points_closed_at", { mode: "timestamp_ms" }),
+    /** When the points were earned after closing. Null on a closed window: the cron finishes it */
+    pointsEarnedAt: integer("points_earned_at", { mode: "timestamp_ms" }),
+    version: integer("version").notNull(),
+    updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    // What the cron picks up: closed, not earned yet
+    index("return_windows_closed").on(t.pointsClosedAt),
   ],
 );
 

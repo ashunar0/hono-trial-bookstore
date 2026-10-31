@@ -1,7 +1,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { updateWithVersion } from "hono-kit/sqlite";
 import type { Db } from "#/db/index";
-import { returnLinesTable, returnsTable } from "#/db/schema";
+import { returnLinesTable, returnsTable, returnWindowsTable } from "#/db/schema";
 
 /** The return and its lines. Run in one batch */
 export const insertReturn = (
@@ -23,3 +23,23 @@ export const markReturnRestored = (db: Db, id: string, at: Date) =>
     .update(returnsTable)
     .set({ restoredAt: at })
     .where(and(eq(returnsTable.id, id), isNull(returnsTable.restoredAt)));
+
+type WindowRow = typeof returnWindowsTable.$inferInsert;
+
+/** No row back when the order already has one (made by someone else in between) */
+export const insertWindow = (db: Db, row: WindowRow) =>
+  db.insert(returnWindowsTable).values(row).onConflictDoNothing().returning();
+
+/** No row back when the version is no longer the one read */
+export const updateWindow = (
+  db: Db,
+  at: { orderId: string; version: number },
+  values: Partial<Omit<WindowRow, "orderId" | "version">>,
+) => updateWithVersion(db, returnWindowsTable, at, values);
+
+/** Records that a closed window's points are earned. Not a change anyone sees, so the version stays */
+export const markPointsEarned = (db: Db, orderId: string, at: Date) =>
+  db
+    .update(returnWindowsTable)
+    .set({ pointsEarnedAt: at })
+    .where(and(eq(returnWindowsTable.orderId, orderId), isNull(returnWindowsTable.pointsEarnedAt)));
