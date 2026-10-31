@@ -2,3 +2,4 @@
 export * from "./queries";
 export * from "./usecases/cancelRestockAlert";
 export * from "./usecases/registerRestockAlert";
+export * from "./usecases/sendRestockAlert";
