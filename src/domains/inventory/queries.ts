@@ -1,6 +1,6 @@
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import type { Db } from "#/db/index";
-import { stocksTable } from "#/db/schema";
+import { reservationsTable, stocksTable } from "#/db/schema";
 import { noStock } from "./rules";
 
 /** The stock of each book asked for. A book with no row has noStock */
@@ -16,4 +16,13 @@ export const stocksOf = async (db: Db, bookIds: string[]) => {
       return [id, row === undefined ? noStock : { quantity: row.quantity, version: row.version }];
     }),
   );
+};
+
+export const findReservation = async (db: Db, id: string) => {
+  const [row] = await db
+    .select()
+    .from(reservationsTable)
+    .where(eq(reservationsTable.id, id))
+    .limit(1);
+  return row;
 };

@@ -29,6 +29,17 @@ it("holding twice with the same id holds once", async () => {
   expect(await quantityOf(book)).toBe(3);
 });
 
+it("holding again with the same id is ok even when the first hold took the last copies", async () => {
+  const deps = makeDeps(env);
+  const book = await bookWith(2);
+  const hold = { reservationId: crypto.randomUUID(), lines: [{ bookId: book, quantity: 2 }], now };
+
+  expect((await reserveStock(deps, hold)).ok).toBe(true);
+  expect((await reserveStock(deps, hold)).ok).toBe(true);
+
+  expect(await quantityOf(book)).toBe(0);
+});
+
 it("giving back twice gives back once", async () => {
   const deps = makeDeps(env);
   const book = await bookWith(5);

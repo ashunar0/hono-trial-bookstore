@@ -14,6 +14,8 @@ import {
   stockOf,
   type Order,
 } from "../../../routes/orders/_test-helpers";
+import { reserveStock } from "#/domains/inventory/index";
+import { reservationIdOfExchange } from "../rules";
 import { receiveExchange } from "./receiveExchange";
 
 // Shipped 2026-11-15 10:00 +09:00: returns are taken until 2026-11-29 10:00 +09:00
@@ -73,6 +75,33 @@ it("two receives of the last copy at once: the copy is held once, and the exchan
       await db().select().from(refundsTable).where(eq(refundsTable.exchangeId, asked.id)),
     ).toHaveLength(1);
   }
+});
+
+it("a receive that held the last copy and stopped before switching is received when done again, not refunded", async () => {
+  const me = someone();
+  const book = await bookWith(1000, 2);
+  await put(me, book, 1);
+  const order = await shippedOrder(me);
+  const asked = await ask(me, order);
+  // The first try held the copy under the exchange's id, then stopped
+  await reserveStock(makeDeps(env), {
+    reservationId: reservationIdOfExchange(asked.id),
+    lines: [{ bookId: book, quantity: 1 }],
+    now: inNovember,
+  });
+  expect(await stockOf(book)).toBe(0);
+
+  const result = await receiveExchange(makeDeps(env), {
+    exchangeId: asked.id,
+    by: "staff",
+    now: inNovember,
+  });
+
+  expect(result.ok && result.value.status).toBe("received");
+  expect(await stockOf(book)).toBe(0);
+  expect(
+    await db().select().from(refundsTable).where(eq(refundsTable.exchangeId, asked.id)),
+  ).toHaveLength(0);
 });
 
 it("a refunded exchange whose points were not recorded as back is finished by the cron, once", async () => {
