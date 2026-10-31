@@ -2,7 +2,7 @@ import { userId, type DepsVariables } from "hono-kit";
 import { releaseCouponUse } from "#/domains/coupon/index";
 import { releaseReservation } from "#/domains/inventory/index";
 import { restorePointsOfUse } from "#/domains/point/index";
-import { insertRefund, markReleased } from "../mutations";
+import { insertRefund, markRestored } from "../mutations";
 import { refundIdOf } from "../rules";
 
 type Cancelled = {
@@ -14,6 +14,7 @@ type Cancelled = {
   paidAt: Date | null;
   total: number;
   tax: number;
+  pointsUsed: number;
 };
 
 /**
@@ -30,6 +31,8 @@ export const giveBack = async (deps: DepsVariables["deps"], order: Cancelled, no
       orderId: order.id,
       returnId: null,
       amount: order.total,
+      // The points go back as points, the rest to the card
+      pointsAmount: order.pointsUsed,
       tax: order.tax,
       createdAt: now,
     });
@@ -41,5 +44,5 @@ export const giveBack = async (deps: DepsVariables["deps"], order: Cancelled, no
       customerId: userId(order.customerId),
       now,
     });
-  await markReleased(deps.db, order.id, now);
+  await markRestored(deps.db, order.id, now);
 };

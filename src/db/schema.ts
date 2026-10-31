@@ -240,8 +240,8 @@ export const ordersTable = sqliteTable(
     paidAt: integer("paid_at", { mode: "timestamp_ms" }),
     shippedAt: integer("shipped_at", { mode: "timestamp_ms" }),
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
-    /** When a cancel finished giving back the stock and the coupon. Null on a cancelled order: the cron finishes it */
-    releasedAt: integer("released_at", { mode: "timestamp_ms" }),
+    /** When a cancel finished giving back the stock, the coupon and the points. Null on a cancelled order: the cron finishes it */
+    restoredAt: integer("restored_at", { mode: "timestamp_ms" }),
     version: integer("version").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
@@ -332,6 +332,8 @@ export const refundsTable = sqliteTable("refunds", {
   returnId: text("return_id").unique(),
   /** Yen, tax included */
   amount: integer("amount").notNull(),
+  /** The part of amount given back as points; the rest goes back to the card */
+  pointsAmount: integer("points_amount").notNull().default(0),
   /** The tax within amount */
   tax: integer("tax").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),

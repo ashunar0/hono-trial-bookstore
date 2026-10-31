@@ -25,7 +25,7 @@ export const cancelOrder = async (deps: DepsVariables["deps"], input: Input) => 
   const order = await findFor(db, input.id, input.by);
   if (order === undefined) return err(NotFound.code);
   // Switched to cancelled, but the giving back stopped halfway: the cron runs it again
-  if (input.by === "cron" && order.status === "cancelled" && order.releasedAt === null) {
+  if (input.by === "cron" && order.status === "cancelled" && order.restoredAt === null) {
     await giveBack(deps, order, input.now);
     return ok((await findOrder(db, order.id)) ?? order);
   }

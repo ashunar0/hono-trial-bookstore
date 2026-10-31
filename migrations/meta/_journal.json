@@ -85,6 +85,13 @@
       "when": 1793409613488,
       "tag": "0011_daily_clint_barton",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1793409735457,
+      "tag": "0012_bouncy_phalanx",
+      "breakpoints": true
     }
   ]
 }

@@ -38,11 +38,11 @@ export const insertRefund = (db: Db, row: typeof refundsTable.$inferInsert) =>
   db.insert(refundsTable).values(row).onConflictDoNothing();
 
 /** Records that a cancel gave everything back. Not a change the customer sees, so the version stays */
-export const markReleased = (db: Db, id: string, at: Date) =>
+export const markRestored = (db: Db, id: string, at: Date) =>
   db
     .update(ordersTable)
-    .set({ releasedAt: at })
-    .where(and(eq(ordersTable.id, id), isNull(ordersTable.releasedAt)));
+    .set({ restoredAt: at })
+    .where(and(eq(ordersTable.id, id), isNull(ordersTable.restoredAt)));
 
 /** The return and its lines. Run in one batch */
 export const insertReturn = (

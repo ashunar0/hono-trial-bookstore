@@ -38,7 +38,7 @@ it("cancels an order past its payment deadline, and gives back its stock and cou
   await sweep(new Date("2026-11-18T10:15:00+09:00"));
   expect(await statusOf(order.id)).toMatchObject({
     status: "cancelled",
-    releasedAt: expect.any(Date),
+    restoredAt: expect.any(Date),
   });
   expect(await stockOf(book)).toBe(5);
   await put(me, book, 1);
@@ -104,7 +104,7 @@ it("finishes a cancel that stopped after switching to cancelled", async () => {
 
   await sweep(new Date("2026-11-15T11:00:00+09:00"));
 
-  expect(await statusOf(order.id)).toMatchObject({ releasedAt: expect.any(Date) });
+  expect(await statusOf(order.id)).toMatchObject({ restoredAt: expect.any(Date) });
   expect(await stockOf(book)).toBe(5);
 });
 

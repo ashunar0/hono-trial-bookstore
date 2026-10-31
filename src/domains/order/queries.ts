@@ -87,7 +87,7 @@ export const ordersToSweep = async (db: Db, now: Date, limit: number) => {
     db
       .select(pick)
       .from(ordersTable)
-      .where(and(eq(ordersTable.status, "cancelled"), isNull(ordersTable.releasedAt)))
+      .where(and(eq(ordersTable.status, "cancelled"), isNull(ordersTable.restoredAt)))
       .orderBy(asc(ordersTable.cancelledAt))
       .limit(limit),
   ]);
