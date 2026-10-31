@@ -233,3 +233,33 @@ it("one alert that throws does not stop the others, and the run still fails so i
   // Its attempt was recorded before the call, so the next run sends it again
   expect(await rowOf(bad.id)).toMatchObject({ status: "sending", attempts: 1 });
 });
+
+it("takes at most 100 alerts in one run, the ones being sent first", async () => {
+  const book = await bookWith(1000, 0);
+  for (let i = 0; i < 100; i++)
+    await db()
+      .insert(stockAlertsTable)
+      .values({
+        id: crypto.randomUUID(),
+        customerId: `cap-${i}`,
+        bookId: book,
+        email: `cap-${i}@example.com`,
+        status: "sending",
+        attempts: 1,
+        createdAt: t0,
+      });
+  const backBook = await bookWith(1000, 3);
+  await setStock(backBook, 0);
+  const fresh = await ask(someone(), backBook);
+  await setStock(backBook, 3);
+  const outbox: Mail[] = [];
+
+  await run(collectingMailer(outbox), minutes(15));
+
+  expect(outbox).toHaveLength(100);
+  expect(mailsOf(outbox, fresh.id)).toHaveLength(0);
+  expect(await rowOf(fresh.id)).toMatchObject({ status: "waiting" });
+
+  await run(collectingMailer(outbox), minutes(30));
+  expect(mailsOf(outbox, fresh.id)).toHaveLength(1);
+});

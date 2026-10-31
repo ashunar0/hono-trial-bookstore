@@ -9,7 +9,7 @@ import {
 import { inStock } from "#/domains/stock-alert/rules";
 import type { Db } from "#/db/index";
 
-/** How many alerts one run takes; the rest wait for the next run */
+/** How many alerts one run takes, the ones being sent and the fresh ones together; the rest wait for the next run */
 const perRun = 100;
 
 /** How many books are asked about at once (D1 takes few bound values in one query) */
@@ -49,7 +49,7 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
   };
 
   const retries = await sendingAlerts(deps.db, perRun);
-  const fresh = await waitingInStock(deps.db, perRun);
+  const fresh = await waitingInStock(deps.db, perRun - retries.length);
   for (const alert of [...retries, ...fresh]) await each(alert.id);
 
   if (errors.length === 1) throw errors[0];
