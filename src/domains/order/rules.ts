@@ -92,8 +92,18 @@ export const placingTimeoutMs = 10 * 60 * 1000;
 export const returnStatuses = ["requested", "completed", "rejected"] as const;
 
 /** A return is requested within 14 days of shipping */
-export const returnDeadlineOf = (shippedAt: Date) =>
-  new Date(shippedAt.getTime() + 14 * 24 * 60 * 60 * 1000);
+export const returnPeriodMs = 14 * 24 * 60 * 60 * 1000;
+
+export const returnDeadlineOf = (shippedAt: Date) => new Date(shippedAt.getTime() + returnPeriodMs);
+
+/**
+ * The yen the points are earned on: the books after the discount, less the money given back for returned books.
+ * The shipping fee is not in it, and what was paid with points is
+ */
+export const earnBaseOf = (
+  order: { subtotal: number; discount: number },
+  returnRefunds: number[],
+) => order.subtotal - order.discount - returnRefunds.reduce((sum, amount) => sum + amount, 0);
 
 /** How many copies of a line can still be asked back: shipped, less the requested and completed ones */
 export const returnableOf = (shipped: number, counted: number) => Math.max(shipped - counted, 0);

@@ -7,3 +7,4 @@ export * from "./usecases/receiveReturn";
 export * from "./usecases/rejectReturn";
 export * from "./usecases/requestReturn";
 export * from "./usecases/shipOrder";
+export * from "./usecases/grantOrderPoints";

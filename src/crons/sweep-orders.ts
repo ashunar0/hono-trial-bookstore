@@ -1,12 +1,19 @@
 import { createCron } from "hono-kit";
-import { cancelOrder, ordersToSweep, receiveReturn, returnsToSweep } from "#/domains/order/index";
+import {
+  cancelOrder,
+  grantOrderPoints,
+  ordersToGrant,
+  ordersToSweep,
+  receiveReturn,
+  returnsToSweep,
+} from "#/domains/order/index";
 
 /** How many of each kind one run takes; the rest wait for the next run */
 const perRun = 100;
 
 /**
  * Every 15 minutes: cancels orders past their payment deadline and orders left placing, and finishes cancels and
- * received returns that stopped halfway. It writes nothing itself: cancelOrder does, and is safe to call again on the same order.
+ * received returns that stopped halfway, and gives the points of shipped orders whose return period is over. It writes nothing itself: cancelOrder does, and is safe to call again on the same order.
  * One that throws does not stop the rest (the next run would pick the same one first and stop there again):
  * the run goes on, then fails with every error, so the failure is still seen
  */
@@ -27,7 +34,11 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
   for (const found of await returnsToSweep(deps.db, perRun)) {
     await each(() => receiveReturn(deps, { returnId: found.id, by: "cron", now }));
   }
+  for (const order of await ordersToGrant(deps.db, now, perRun)) {
+    // One that lost to a return asked at the last moment is left: the next run finds it again if it still stands
+    await each(() => grantOrderPoints(deps, { id: order.id, now }));
+  }
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1)
-    throw new AggregateError(errors, `${errors.length} orders and returns failed`);
+    throw new AggregateError(errors, `${errors.length} orders, returns and point grants failed`);
 });

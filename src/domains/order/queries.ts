@@ -1,4 +1,19 @@
-import { and, asc, desc, eq, inArray, isNull, lt, lte, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  exists,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  lte,
+  ne,
+  not,
+  or,
+  sql,
+} from "drizzle-orm";
 import type { UserId } from "hono-kit";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
@@ -9,7 +24,7 @@ import {
   returnLinesTable,
   returnsTable,
 } from "#/db/schema";
-import { placingTimeoutMs, returnStatuses, visibleStatuses } from "./rules";
+import { placingTimeoutMs, returnPeriodMs, returnStatuses, visibleStatuses } from "./rules";
 
 /** Any status, placing too: the caller decides what to show */
 export const findOrder = async (db: Db, id: string) => {
@@ -174,3 +189,39 @@ export const returnsToSweep = (db: Db, limit: number) =>
     .where(and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)))
     .orderBy(asc(returnsTable.completedAt))
     .limit(limit);
+
+/**
+ * Shipped orders whose points the cron must work on, oldest first, at most `limit` of each: to close (the return period
+ * is over, no return is waiting, not closed yet) and closed with the earning not done. Orders from before points have
+ * no earn id and earn nothing
+ */
+export const ordersToGrant = async (db: Db, now: Date, limit: number) => {
+  const waiting = db
+    .select({ id: returnsTable.id })
+    .from(returnsTable)
+    .where(and(eq(returnsTable.orderId, ordersTable.id), eq(returnsTable.status, "requested")));
+  const [toClose, toFinish] = await db.batch([
+    db
+      .select({ id: ordersTable.id })
+      .from(ordersTable)
+      .where(
+        and(
+          eq(ordersTable.status, "shipped"),
+          isNotNull(ordersTable.earnId),
+          isNull(ordersTable.pointsClosedAt),
+          // The deadline itself still takes a return, so it is not over yet
+          lt(ordersTable.shippedAt, new Date(now.getTime() - returnPeriodMs)),
+          not(exists(waiting)),
+        ),
+      )
+      .orderBy(asc(ordersTable.shippedAt))
+      .limit(limit),
+    db
+      .select({ id: ordersTable.id })
+      .from(ordersTable)
+      .where(and(isNotNull(ordersTable.pointsClosedAt), isNull(ordersTable.pointsEarnedAt)))
+      .orderBy(asc(ordersTable.pointsClosedAt))
+      .limit(limit),
+  ]);
+  return [...toClose, ...toFinish];
+};

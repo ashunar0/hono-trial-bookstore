@@ -242,6 +242,10 @@ export const ordersTable = sqliteTable(
     cancelledAt: integer("cancelled_at", { mode: "timestamp_ms" }),
     /** When a cancel finished giving back the stock, the coupon and the points. Null on a cancelled order: the cron finishes it */
     restoredAt: integer("restored_at", { mode: "timestamp_ms" }),
+    /** When the points to earn were closed: the return period is over and no return is waiting. Set once */
+    pointsClosedAt: integer("points_closed_at", { mode: "timestamp_ms" }),
+    /** When the points were earned after closing. Null on a closed order: the cron finishes it */
+    pointsEarnedAt: integer("points_earned_at", { mode: "timestamp_ms" }),
     version: integer("version").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
