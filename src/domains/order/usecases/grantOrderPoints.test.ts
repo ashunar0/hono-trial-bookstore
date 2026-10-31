@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { cron } from "#/crons/sweep-orders";
-import { ordersTable } from "#/db/schema";
+import { ordersTable, returnsTable } from "#/db/schema";
 import { makeDeps } from "#/main";
 import { carol, db, request, someone } from "../../../../test/fixtures";
 import {
@@ -124,6 +124,28 @@ it("skips an order with a return waiting, and earns once the return is decided",
   await sweep(new Date(justAfter.getTime() + 15 * 60 * 1000));
 
   expect(await pointsOf(me)).toBe(50);
+});
+
+it("skips an order whose return is completed but not refunded yet (the receive is between its steps)", async () => {
+  const me = someone();
+  await put(me, await bookWith(5000, 5), 1);
+  const order = await shippedOrder(me);
+  const returned = await ask(me, order);
+  // receiveReturn wrote 1 (completed) and not yet 2 (the refund)
+  await db()
+    .update(returnsTable)
+    .set({ status: "completed", completedAt: inNovember })
+    .where(eq(returnsTable.id, returned.id));
+
+  await grantOrderPoints(makeDeps(env), { id: order.id, now: justAfter });
+  expect(await pointsOf(me)).toBe(0);
+  expect((await rowOf(order.id)).pointsClosedAt).toBeNull();
+
+  // The cron finishes the receive first, then earns on what is left: nothing
+  await sweep(justAfter);
+  await sweep(new Date(justAfter.getTime() + 15 * 60 * 1000));
+  expect(await pointsOf(me)).toBe(0);
+  expect((await rowOf(order.id)).pointsEarnedAt).toEqual(expect.any(Date));
 });
 
 it("earns nothing on an order whose books were all returned, and does not try again", async () => {

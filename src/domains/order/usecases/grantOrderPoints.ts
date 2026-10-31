@@ -7,6 +7,10 @@ import { earnBaseOf, OrderStatusConflict, returnDeadlineOf } from "../rules";
 
 type Input = { id: string; now: Date };
 
+/** Waiting, or completed with its refund, stock and points not all back yet */
+const unsettled = (row: { status: string; restoredAt: Date | null }) =>
+  row.status === "requested" || (row.status === "completed" && row.restoredAt === null);
+
 /**
  * The customer earns points on a shipped order once its return period is over. Called by the cron only.
  * 1 the order closes its points (the version moves, a return waiting stops it) → 2 the points are earned under the
@@ -29,8 +33,9 @@ export const grantOrderPoints = async (deps: DepsVariables["deps"], input: Input
       return err({ code: OrderStatusConflict.code, details: { status: order.status } });
     // The deadline itself still takes a return
     if (input.now <= returnDeadlineOf(order.shippedAt)) return ok({ earned: null });
+    // A return being received counts too: completed before its refund is written, it would earn on the books
     const returns = await returnsOf(db, order.id);
-    if (returns.some((row) => row.status === "requested")) return ok({ earned: null });
+    if (returns.some(unsettled)) return ok({ earned: null });
 
     const [closed] = await updateOrder(
       db,

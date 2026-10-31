@@ -199,7 +199,16 @@ export const ordersToGrant = async (db: Db, now: Date, limit: number) => {
   const waiting = db
     .select({ id: returnsTable.id })
     .from(returnsTable)
-    .where(and(eq(returnsTable.orderId, ordersTable.id), eq(returnsTable.status, "requested")));
+    .where(
+      and(
+        eq(returnsTable.orderId, ordersTable.id),
+        // A return being received too: its refund may not be written yet
+        or(
+          eq(returnsTable.status, "requested"),
+          and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)),
+        ),
+      ),
+    );
   const [toClose, toFinish] = await db.batch([
     db
       .select({ id: ordersTable.id })
