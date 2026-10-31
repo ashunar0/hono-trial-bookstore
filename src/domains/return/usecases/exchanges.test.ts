@@ -162,7 +162,8 @@ it("an order with an exchange waiting earns nothing until it is decided, then ea
 
   await sweep(justAfter);
   expect(await pointsOf(me)).toBe(0);
-  expect(await windowOf(order.id)).toMatchObject({ pointsClosedAt: null, version: 1 });
+  // Opened at the ship (1), moved by the request (2)
+  expect(await windowOf(order.id)).toMatchObject({ pointsClosedAt: null, version: 2 });
 
   await request(carol, "POST", `/exchanges/${asked.id}/reject`, { reason: "x" }, inNovember);
   await sweep(later(15));
@@ -207,7 +208,8 @@ it("once the points are closed the window has moved on, and no request is taken 
   // The close ran first and moved the window; a request that read the window before it would carry the old version
   await sweep(justAfter);
   const closed = await windowOf(order.id);
-  expect(closed).toMatchObject({ version: 1, pointsClosedAt: expect.any(Date) });
+  // Opened at the ship (1), moved by the close (2)
+  expect(closed).toMatchObject({ version: 2, pointsClosedAt: expect.any(Date) });
 
   // After the period no request is taken at all
   const late = await request(

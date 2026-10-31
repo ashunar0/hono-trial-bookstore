@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { cron } from "#/crons/sweep-orders";
 import { returnsTable, returnWindowsTable } from "#/db/schema";
+import { shipOrder as shipOrderOnly } from "#/domains/order/index";
 import { makeDeps } from "#/main";
 import { carol, db, request, someone } from "../../../../test/fixtures";
 import {
@@ -201,4 +202,35 @@ it("does nothing for an order that is not shipped", async () => {
   const result = await grantOrderPoints(makeDeps(env), { id: order.id, now: justAfter });
 
   expect(result).toMatchObject({ ok: false, error: { code: "ORDER_STATUS_CONFLICT" } });
+});
+
+it("shipping opens the order's return window, with when it was shipped", async () => {
+  const me = someone();
+  await put(me, await bookWith(1990, 5), 1);
+  const order = await shippedOrder(me);
+
+  const [row] = await db()
+    .select()
+    .from(returnWindowsTable)
+    .where(eq(returnWindowsTable.orderId, order.id));
+  expect(row).toMatchObject({ shippedAt: inNovember, pointsClosedAt: null });
+});
+
+it("a ship that stopped before opening the window gets it from the cron, and the order still earns", async () => {
+  const me = someone();
+  await put(me, await bookWith(1990, 5), 1);
+  const placed = (await (await place(me)).json()) as Order;
+  await request(me, "POST", `/orders/${placed.id}/pay`, undefined, inNovember);
+  // Shipped in order, and stopped before return opened the window
+  await shipOrderOnly(makeDeps(env), { id: placed.id, now: inNovember });
+
+  await sweep(new Date(inNovember.getTime() + 15 * 60 * 1000));
+  const [row] = await db()
+    .select()
+    .from(returnWindowsTable)
+    .where(eq(returnWindowsTable.orderId, placed.id));
+  expect(row).toMatchObject({ shippedAt: inNovember });
+
+  await sweep(justAfter);
+  expect(await pointsOf(me)).toBe(19);
 });

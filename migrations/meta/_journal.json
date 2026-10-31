@@ -134,6 +134,13 @@
       "when": 1793417058243,
       "tag": "0018_soft_thunderbolts",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1793417721172,
+      "tag": "0019_previous_colonel_america",
+      "breakpoints": true
     }
   ]
 }

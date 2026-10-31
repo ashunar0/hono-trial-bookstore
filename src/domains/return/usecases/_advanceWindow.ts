@@ -18,12 +18,29 @@ type Input = {
  * exchange, and the close of the points moves it too, so a request asked at the last moment and the close cannot both
  * stand. The first move of an order makes the window (version 1)
  */
+/** A window the ship did not open (it stopped before): opened now with the order's copies, as the ship would have */
+const openLate = async (
+  db: DepsVariables["deps"]["db"],
+  orderId: string,
+  values: { pointsClosedAt?: Date; updatedAt: Date },
+) => {
+  const order = await findOrder(db, orderId);
+  if (order?.shippedAt == null) return [];
+  return insertWindow(db, {
+    orderId,
+    shippedAt: order.shippedAt,
+    earnId: order.earnId,
+    ...values,
+    version: 1,
+  });
+};
+
 export const advanceWindow = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
   const values = { ...input.values, updatedAt: input.now };
   const [row] =
     input.version === 0
-      ? await insertWindow(db, { orderId: input.orderId, ...values, version: 1 })
+      ? await openLate(db, input.orderId, values)
       : await updateWindow(db, { orderId: input.orderId, version: input.version }, values);
   if (row !== undefined) return ok(row);
 

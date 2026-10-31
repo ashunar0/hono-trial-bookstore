@@ -4,8 +4,10 @@ import {
   exchangesToSweep,
   grantOrderPoints,
   pickOrdersToGrant,
+  pickOrdersWithoutWindow,
   receiveExchange,
   rejectExchange,
+  shipAndOpenWindow,
   receiveReturn,
   returnsToSweep,
 } from "#/domains/return/index";
@@ -42,6 +44,9 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
         ? rejectExchange(deps, { exchangeId: found.id, by: "cron", now })
         : receiveExchange(deps, { exchangeId: found.id, by: "cron", now }),
     );
+  }
+  for (const order of await pickOrdersWithoutWindow(deps, { now, limit: perRun })) {
+    await each(() => shipAndOpenWindow(deps, { id: order.id, by: "cron", now }));
   }
   for (const order of await pickOrdersToGrant(deps, { now, limit: perRun })) {
     // One that lost to a return asked at the last moment is left: the next run finds it again if it still stands

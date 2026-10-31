@@ -1,4 +1,17 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  inArray,
+  isNotNull,
+  isNull,
+  lt,
+  ne,
+  notExists,
+  or,
+  sql,
+} from "drizzle-orm";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
 import {
@@ -110,38 +123,60 @@ export const returnsToSweep = (db: Db, limit: number) =>
     .limit(limit);
 
 /**
- * Of these orders, the ones with a return or an exchange not settled: waiting, or its refund and the stock or points
- * not all back (a completed return, a refunded exchange). A received exchange is settled: its money is decided
+ * Open windows whose return period ended before `before` (orders that earn) with no return or exchange waiting, oldest
+ * first. Waiting: requested, or completed (a return) or refunded (an exchange) with its refund, stock and points not
+ * all back yet. A received exchange is settled: its money is decided
  */
-export const orderIdsWithUnsettled = async (db: Db, orderIds: string[]) => {
+export const windowsToClose = (db: Db, before: Date, limit: number) =>
+  db
+    .select({ orderId: returnWindowsTable.orderId })
+    .from(returnWindowsTable)
+    .where(
+      and(
+        isNull(returnWindowsTable.pointsClosedAt),
+        isNotNull(returnWindowsTable.earnId),
+        lt(returnWindowsTable.shippedAt, before),
+        notExists(
+          db
+            .select({ id: returnsTable.id })
+            .from(returnsTable)
+            .where(
+              and(
+                eq(returnsTable.orderId, returnWindowsTable.orderId),
+                or(
+                  eq(returnsTable.status, "requested"),
+                  and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)),
+                ),
+              ),
+            ),
+        ),
+        notExists(
+          db
+            .select({ id: exchangesTable.id })
+            .from(exchangesTable)
+            .where(
+              and(
+                eq(exchangesTable.orderId, returnWindowsTable.orderId),
+                or(
+                  eq(exchangesTable.status, "requested"),
+                  and(eq(exchangesTable.status, "refunded"), isNull(exchangesTable.restoredAt)),
+                ),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(asc(returnWindowsTable.shippedAt), asc(returnWindowsTable.orderId))
+    .limit(limit);
+
+/** Of these orders, the ones whose window is open (or closed) already */
+export const windowOrderIdsOf = async (db: Db, orderIds: string[]) => {
   if (orderIds.length === 0) return new Set<string>();
-  const [returns, exchanges] = await db.batch([
-    db
-      .selectDistinct({ orderId: returnsTable.orderId })
-      .from(returnsTable)
-      .where(
-        and(
-          inArray(returnsTable.orderId, orderIds),
-          or(
-            eq(returnsTable.status, "requested"),
-            and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)),
-          ),
-        ),
-      ),
-    db
-      .selectDistinct({ orderId: exchangesTable.orderId })
-      .from(exchangesTable)
-      .where(
-        and(
-          inArray(exchangesTable.orderId, orderIds),
-          or(
-            eq(exchangesTable.status, "requested"),
-            and(eq(exchangesTable.status, "refunded"), isNull(exchangesTable.restoredAt)),
-          ),
-        ),
-      ),
-  ]);
-  return new Set([...returns, ...exchanges].map((row) => row.orderId));
+  const rows = await db
+    .select({ orderId: returnWindowsTable.orderId })
+    .from(returnWindowsTable)
+    .where(inArray(returnWindowsTable.orderId, orderIds));
+  return new Set(rows.map((row) => row.orderId));
 };
 
 /** The return window of an order. None yet reads as version 0 (see returnWindowsTable) */
@@ -152,21 +187,6 @@ export const findWindow = async (db: Db, orderId: string) => {
     .where(eq(returnWindowsTable.orderId, orderId))
     .limit(1);
   return row;
-};
-
-/** Of these orders, the ones whose points are closed already */
-export const orderIdsClosed = async (db: Db, orderIds: string[]) => {
-  if (orderIds.length === 0) return new Set<string>();
-  const rows = await db
-    .select({ orderId: returnWindowsTable.orderId })
-    .from(returnWindowsTable)
-    .where(
-      and(
-        inArray(returnWindowsTable.orderId, orderIds),
-        isNotNull(returnWindowsTable.pointsClosedAt),
-      ),
-    );
-  return new Set(rows.map((row) => row.orderId));
 };
 
 /** Windows closed whose points are not earned yet (the cron finishes them), oldest first */

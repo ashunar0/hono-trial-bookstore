@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
 import type { UserId } from "hono-kit";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
@@ -103,29 +103,11 @@ export const ordersToSweep = async (db: Db, now: Date, limit: number) => {
   return [...expired, ...stuck, ...unfinished];
 };
 
-/**
- * Shipped orders that earn points and were shipped before `before`, oldest first, `limit` of them after `after`.
- * Whether their return window is closed, or a return is waiting, is return's to say
- */
-export const shippedOrdersEarning = (
-  db: Db,
-  input: { before: Date; after?: { at: Date; id: string }; limit: number },
-) =>
+/** Orders shipped at or after `since`, oldest first. Whether their return window is open is return's to say */
+export const ordersShippedSince = (db: Db, since: Date, limit: number) =>
   db
-    .select({ id: ordersTable.id, shippedAt: ordersTable.shippedAt })
+    .select({ id: ordersTable.id })
     .from(ordersTable)
-    .where(
-      and(
-        eq(ordersTable.status, "shipped"),
-        isNotNull(ordersTable.earnId),
-        lt(ordersTable.shippedAt, input.before),
-        input.after === undefined
-          ? undefined
-          : or(
-              gt(ordersTable.shippedAt, input.after.at),
-              and(eq(ordersTable.shippedAt, input.after.at), gt(ordersTable.id, input.after.id)),
-            ),
-      ),
-    )
+    .where(and(eq(ordersTable.status, "shipped"), gte(ordersTable.shippedAt, since)))
     .orderBy(asc(ordersTable.shippedAt), asc(ordersTable.id))
-    .limit(input.limit);
+    .limit(limit);

@@ -409,6 +409,10 @@ export const returnWindowsTable = sqliteTable(
     orderId: text("order_id")
       .primaryKey()
       .references(() => ordersTable.id),
+    /** Copied from the order when it is shipped: the return period runs from it */
+    shippedAt: integer("shipped_at", { mode: "timestamp_ms" }).notNull(),
+    /** Copied from the order: null for one that earns nothing, never closed */
+    earnId: text("earn_id"),
     /** When the points to earn were closed: the return period is over and nothing is waiting. Set once */
     pointsClosedAt: integer("points_closed_at", { mode: "timestamp_ms" }),
     /** When the points were earned after closing. Null on a closed window: the cron finishes it */
@@ -417,8 +421,8 @@ export const returnWindowsTable = sqliteTable(
     updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
   },
   (t) => [
-    // What the cron picks up: closed, not earned yet
-    index("return_windows_closed").on(t.pointsClosedAt),
+    // What the cron picks up: open past the period, or closed and not earned yet
+    index("return_windows_closed").on(t.pointsClosedAt, t.shippedAt),
   ],
 );
 

@@ -1,12 +1,12 @@
 import { z } from "zod";
 import { createEndpoint, errorResponses, NotFound } from "hono-kit";
 import { requireRole } from "#/auth";
-import { shipOrder } from "#/domains/order/index";
+import { shipAndOpenWindow } from "#/domains/return/index";
 import { OrderStatusConflict } from "#/domains/order/rules";
 import { readOrder } from "../../_read";
 import { orderResponseSchema } from "../../_response";
 
-/** Staff ship a paid order */
+/** Staff ship a paid order. Its return window opens with it (return's) */
 export const POST = createEndpoint(
   {
     auth: requireRole("staff"),
@@ -14,8 +14,9 @@ export const POST = createEndpoint(
     responses: { 200: orderResponseSchema, ...errorResponses(NotFound, OrderStatusConflict) },
   },
   async (c, reply) => {
-    const result = await shipOrder(c.var.deps, {
+    const result = await shipAndOpenWindow(c.var.deps, {
       id: c.req.valid("param").id,
+      by: "staff",
       now: c.get("now"),
     });
     if (!result.ok) return reply.failure(result.error);
