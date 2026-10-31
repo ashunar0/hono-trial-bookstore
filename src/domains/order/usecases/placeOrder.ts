@@ -1,24 +1,40 @@
 import { err, ok, type DepsVariables, type UserId } from "hono-kit";
 import { findBooks } from "#/domains/book/index";
 import { cartItemsOf, emptyCart } from "#/domains/cart/index";
-import { findCouponByCode, useCoupon } from "#/domains/coupon/index";
+import { findCouponByCode, releaseCouponUse, useCoupon } from "#/domains/coupon/index";
 import { CouponNotApplicable } from "#/domains/coupon/rules";
 import { releaseReservation, reserveStock } from "#/domains/inventory/index";
+import { usePoints } from "#/domains/point/index";
 import { priceCart } from "#/domains/pricing/rules";
 import { deleteOrder, insertOrder, updateOrder } from "../mutations";
 import { findOrder } from "../queries";
 import { giveBack } from "./_giveBack";
-import { CartEmpty, OrderStatusConflict, allocateDiscount, paymentDueOf } from "../rules";
+import {
+  CartEmpty,
+  OrderStatusConflict,
+  PointsExceedTotal,
+  allocateDiscount,
+  allocatePoints,
+  amountToPay,
+  paymentDueOf,
+} from "../rules";
 
-type Input = { customerId: UserId; couponCode: string | undefined; now: Date };
+type Input = {
+  customerId: UserId;
+  couponCode: string | undefined;
+  /** Points to pay with, 1 or more. Undefined pays with none */
+  points: number | undefined;
+  now: Date;
+};
 
 /**
  * The cart becomes an order. The order switches to awaiting_payment last: until then nothing is promised.
- * 1 the order as placing, with the ids of the hold and the coupon use made here → 2 hold the stock →
- * 3 use the coupon → 4 awaiting_payment → 5 empty the cart.
- * Failing at 2 or 3 takes back what was done and deletes the order. Stopping halfway (the Worker dies) leaves
+ * 1 the order as placing, with the ids of the hold, the coupon use, the point use and the earning made here →
+ * 2 hold the stock → 3 use the coupon → 4 use the points → 5 awaiting_payment (paid at once when the points
+ * cover the whole total: nothing is left for the card) → 6 empty the cart.
+ * Failing at 2, 3 or 4 takes back what was done and deletes the order. Stopping halfway (the Worker dies) leaves
  * a placing order with its ids, and the cron cancels it with them.
- * CART_EMPTY → COUPON_NOT_APPLICABLE → OUT_OF_STOCK → COUPON_ALREADY_USED
+ * CART_EMPTY → COUPON_NOT_APPLICABLE → POINTS_EXCEED_TOTAL → OUT_OF_STOCK → COUPON_ALREADY_USED → POINTS_INSUFFICIENT
  */
 export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
@@ -40,9 +56,15 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
   );
   if (money.notApplicable !== null)
     return err({ code: CouponNotApplicable.code, details: { reason: money.notApplicable } });
-  const discounts = allocateDiscount(
-    lines.map((line) => line.unitPrice * line.quantity),
-    money.discount,
+  const points = input.points ?? 0;
+  if (points > money.total)
+    return err({ code: PointsExceedTotal.code, details: { total: money.total } });
+  const amounts = lines.map((line) => line.unitPrice * line.quantity);
+  const discounts = allocateDiscount(amounts, money.discount);
+  const shares = allocatePoints(
+    amounts.map((amount, i) => amount - (discounts[i] ?? 0)),
+    money.shippingFee,
+    points,
   );
 
   // 1
@@ -59,6 +81,10 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
     couponCode: coupon?.code ?? null,
     reservationId: crypto.randomUUID(),
     couponUseId: coupon === undefined ? null : crypto.randomUUID(),
+    pointsUsed: points,
+    shippingPoints: shares.shipping,
+    pointUseId: points === 0 ? null : crypto.randomUUID(),
+    earnId: crypto.randomUUID(),
     paymentDueAt: paymentDueOf(now),
     version: 1,
     createdAt: now,
@@ -69,6 +95,7 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
     orderId: order.id,
     ...line,
     discount: discounts[i] ?? 0,
+    points: shares.lines[i] ?? 0,
     position: i,
   }));
   await db.batch(insertOrder(db, order, orderLines));
@@ -95,11 +122,31 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
     }
   }
 
-  // 4. Only the cron touches a placing order, and only after 10 minutes
+  // 4
+  if (order.pointUseId !== null) {
+    const spent = await usePoints(deps, {
+      useId: order.pointUseId,
+      customerId,
+      points,
+      now,
+    });
+    if (!spent.ok) {
+      if (order.couponUseId !== null)
+        await releaseCouponUse(deps, { useId: order.couponUseId, now });
+      await releaseReservation(deps, { reservationId: order.reservationId, now });
+      await db.batch(deleteOrder(db, order.id));
+      return spent;
+    }
+  }
+
+  // 5. Only the cron touches a placing order, and only after 10 minutes. Nothing left for the card: paid, and the
+  // payment is not asked at all
   const [placed] = await updateOrder(
     db,
     { id: order.id, version: order.version },
-    { status: "awaiting_payment", updatedAt: now },
+    amountToPay(order) === 0
+      ? { status: "paid", paidAt: now, updatedAt: now }
+      : { status: "awaiting_payment", updatedAt: now },
   );
   if (placed === undefined) {
     // The cron cancelled it first. It may have given back before this held or used anything: give back again.
@@ -112,7 +159,7 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
     });
   }
 
-  // 5. The order stands even if this fails: the customer takes the books out by hand
+  // 6. The order stands even if this fails: the customer takes the books out by hand
   await emptyCart(deps, { customerId }).catch(() => undefined);
 
   return ok({ order: placed, lines: orderLines });

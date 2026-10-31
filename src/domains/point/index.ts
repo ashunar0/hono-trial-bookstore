@@ -3,3 +3,4 @@ export * from "./queries";
 export * from "./usecases/earnPoints";
 export * from "./usecases/restorePoints";
 export * from "./usecases/usePoints";
+export * from "./usecases/restorePointsOfUse";

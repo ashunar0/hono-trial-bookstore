@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocateDiscount, paymentDueOf, refundOf } from "./rules";
+import { allocateDiscount, allocatePoints, amountToPay, paymentDueOf, refundOf } from "./rules";
 
 it("splits the discount by the lines' amounts; the last line takes the rest (the design's example)", () => {
   expect(allocateDiscount([2000, 1500], 500)).toEqual([285, 215]);
@@ -31,4 +31,35 @@ describe("refundOf", () => {
     // All three: what was paid for the line
     expect(refundOf(line, 0, 3)).toBe(2500);
   });
+});
+
+describe("allocatePoints", () => {
+  it("the fee is a share too: 500 points on a 1,000 yen book and a 550 yen fee (the design's example)", () => {
+    expect(allocatePoints([1000], 550, 500)).toEqual({ lines: [323], shipping: 177 });
+  });
+
+  it("splits by what each line cost after the discount; the last book takes the rest", () => {
+    const { lines, shipping } = allocatePoints([1000, 1000, 1000], 0, 100);
+
+    expect(lines).toEqual([33, 33, 34]);
+    expect(shipping).toBe(0);
+  });
+
+  it("the shares always add up to the points", () => {
+    const { lines, shipping } = allocatePoints([1785, 1215], 550, 777);
+
+    expect(lines.reduce((sum, share) => sum + share, 0) + shipping).toBe(777);
+  });
+
+  it("no points, nothing shared", () => {
+    expect(allocatePoints([1000, 500], 550, 0)).toEqual({ lines: [0, 0], shipping: 0 });
+  });
+
+  it("points for the whole total give every line and the fee exactly its amount", () => {
+    expect(allocatePoints([1785, 1215], 550, 3550)).toEqual({ lines: [1785, 1215], shipping: 550 });
+  });
+});
+
+it("the card pays the total less the points", () => {
+  expect(amountToPay({ total: 3200, pointsUsed: 500 })).toBe(2700);
 });

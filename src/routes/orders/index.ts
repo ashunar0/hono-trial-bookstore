@@ -11,7 +11,13 @@ import { requireRole } from "#/auth";
 import { CouponAlreadyUsed, CouponNotApplicable } from "#/domains/coupon/rules";
 import { OutOfStock } from "#/domains/inventory/rules";
 import { listOrders, placeOrder } from "#/domains/order/index";
-import { CartEmpty, OrderStatusConflict, visibleStatuses } from "#/domains/order/rules";
+import {
+  CartEmpty,
+  OrderStatusConflict,
+  PointsExceedTotal,
+  visibleStatuses,
+} from "#/domains/order/rules";
+import { PointsInsufficient } from "#/domains/point/rules";
 import { orderResponse, orderResponseSchema, orderSummary, orderSummarySchema } from "./_response";
 
 /** A customer sees their own, staff see every order. Newest first; ?status= narrows it */
@@ -32,18 +38,28 @@ export const GET = createEndpoint(
   },
 );
 
-/** The cart becomes an order, awaiting payment. couponCode is optional */
+/**
+ * The cart becomes an order, awaiting payment (paid at once when points cover the whole total).
+ * couponCode and points (1 yen each) are optional
+ */
 export const POST = createEndpoint(
   {
     auth: requireRole("customer"),
-    request: { json: z.object({ couponCode: z.string().min(1).optional() }) },
+    request: {
+      json: z.object({
+        couponCode: z.string().min(1).optional(),
+        points: z.int().min(1).optional(),
+      }),
+    },
     responses: {
       200: orderResponseSchema,
       ...errorResponses(
         CartEmpty,
         CouponNotApplicable,
+        PointsExceedTotal,
         OutOfStock,
         CouponAlreadyUsed,
+        PointsInsufficient,
         OrderStatusConflict,
       ),
     },
@@ -52,6 +68,7 @@ export const POST = createEndpoint(
     const result = await placeOrder(c.var.deps, {
       customerId: c.var.currentUser.id,
       couponCode: c.req.valid("json").couponCode,
+      points: c.req.valid("json").points,
       now: c.get("now"),
     });
     if (!result.ok) return reply.failure(result.error);

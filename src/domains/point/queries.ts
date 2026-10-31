@@ -14,6 +14,16 @@ export const balanceOf = async (db: Db, customerId: string) => {
   return row?.balance ?? 0;
 };
 
+/** One entry by its id */
+export const findEntry = async (db: Db, id: string) => {
+  const [row] = await db
+    .select()
+    .from(pointEntriesTable)
+    .where(eq(pointEntriesTable.id, id))
+    .limit(1);
+  return row;
+};
+
 /** The customer's statement, newest first */
 export const listEntries = async (db: Db, customerId: UserId, query: PageQuery) => {
   const { after, limit } = query;

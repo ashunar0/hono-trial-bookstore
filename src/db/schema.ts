@@ -228,6 +228,14 @@ export const ordersTable = sqliteTable(
     reservationId: text("reservation_id").notNull(),
     /** The same, for the coupon. Null when no coupon */
     couponUseId: text("coupon_use_id"),
+    /** Points paid with, in yen. Part of the payment, not a discount: subtotal − discount + shippingFee = total still */
+    pointsUsed: integer("points_used").notNull().default(0),
+    /** The share of pointsUsed that went to the shipping fee. It does not come back on a return, as the fee does not */
+    shippingPoints: integer("shipping_points").notNull().default(0),
+    /** The same, for the points. Null when no points were used */
+    pointUseId: text("point_use_id"),
+    /** The id the points of this order are earned under, made here so an order earns once. Null on an order from before points */
+    earnId: text("earn_id"),
     paymentDueAt: integer("payment_due_at", { mode: "timestamp_ms" }).notNull(),
     paidAt: integer("paid_at", { mode: "timestamp_ms" }),
     shippedAt: integer("shipped_at", { mode: "timestamp_ms" }),
@@ -262,6 +270,8 @@ export const orderLinesTable = sqliteTable(
     quantity: integer("quantity").notNull(),
     /** This line's share of the order's discount */
     discount: integer("discount").notNull(),
+    /** This line's share of the points paid with */
+    points: integer("points").notNull().default(0),
     /** The order of the lines as they were in the cart */
     position: integer("position").notNull(),
   },

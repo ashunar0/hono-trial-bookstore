@@ -1,4 +1,7 @@
-import type { SessionUser } from "hono-kit";
+import { env } from "cloudflare:workers";
+import { userId, type SessionUser } from "hono-kit";
+import { balanceOf, earnPoints } from "#/domains/point/index";
+import { makeDeps } from "#/main";
 import { carol, request } from "../../../test/fixtures";
 
 export const inNovember = new Date("2026-11-15T10:00:00+09:00");
@@ -61,8 +64,29 @@ export const fixed500 = async () => {
   return code;
 };
 
-export const place = (who: SessionUser, couponCode?: string) =>
-  request(who, "POST", "/orders", couponCode === undefined ? {} : { couponCode }, inNovember);
+export const place = (who: SessionUser, couponCode?: string, points?: number) =>
+  request(
+    who,
+    "POST",
+    "/orders",
+    {
+      ...(couponCode === undefined ? {} : { couponCode }),
+      ...(points === undefined ? {} : { points }),
+    },
+    inNovember,
+  );
+
+/** Gives the customer this many points (earned on 100 yen each) */
+export const withPoints = async (who: SessionUser, points: number) => {
+  await earnPoints(makeDeps(env), {
+    earnId: crypto.randomUUID(),
+    customerId: userId(who.id),
+    yen: points * 100,
+    now: inNovember,
+  });
+};
+
+export const pointsOf = (who: SessionUser) => balanceOf(makeDeps(env).db, who.id);
 
 /** An order of one book, placed in November */
 export const placedOrder = async (who: SessionUser, bookId: string, couponCode?: string) => {

@@ -4,9 +4,10 @@ import { expect, it } from "vitest";
 import { makeDeps } from "#/main";
 import { someone } from "../../../../test/fixtures";
 import { balanceOf, listEntries } from "../queries";
-import { restoreIdOfReturn, restoreIdOfUse } from "../rules";
+import { restoreIdOfReturn } from "../rules";
 import { earnPoints } from "./earnPoints";
 import { restorePoints } from "./restorePoints";
+import { restorePointsOfUse } from "./restorePointsOfUse";
 import { usePoints } from "./usePoints";
 
 const now = new Date("2026-11-15T00:00:00Z");
@@ -82,17 +83,39 @@ it("using twice with the same id uses once", async () => {
   expect(await balance(me)).toBe(300);
 });
 
-it("giving back twice with the same id gives back once; 0 gives back nothing", async () => {
+it("giving back a use twice gives back once", async () => {
   const me = await customerWith(500);
   const useId = crypto.randomUUID();
   await usePoints(makeDeps(env), { useId, customerId: me, points: 200, now });
-  const back = { restoreId: restoreIdOfUse(useId), customerId: me, points: 200, now };
 
-  await restorePoints(makeDeps(env), back);
-  await restorePoints(makeDeps(env), back);
-  await restorePoints(makeDeps(env), { ...back, restoreId: restoreIdOfReturn("r1"), points: 0 });
+  await restorePointsOfUse(makeDeps(env), { useId, customerId: me, now });
+  await restorePointsOfUse(makeDeps(env), { useId, customerId: me, now });
 
   expect(await balance(me)).toBe(500);
+  const entries = await listEntries(makeDeps(env).db, me, { limit: 10 });
+  expect(
+    entries.items.map((e) => `${e.kind}:${e.amount}`).sort((a, b) => a.localeCompare(b)),
+  ).toEqual(["earn:500", "restore:200", "use:-200"]);
+});
+
+it("giving back a use that was never made gives back nothing (no points out of nothing)", async () => {
+  const me = await customerWith(500);
+
+  await restorePointsOfUse(makeDeps(env), { useId: crypto.randomUUID(), customerId: me, now });
+
+  expect(await balance(me)).toBe(500);
+});
+
+it("a part of the points can be given back once per id; 0 gives back nothing", async () => {
+  const me = await customerWith(500);
+  await usePoints(makeDeps(env), { useId: "u-part", customerId: me, points: 300, now });
+  const back = { restoreId: restoreIdOfReturn("r1"), customerId: me, points: 100, now };
+
+  await restorePoints(makeDeps(env), back);
+  await restorePoints(makeDeps(env), back);
+  await restorePoints(makeDeps(env), { ...back, restoreId: restoreIdOfReturn("r2"), points: 0 });
+
+  expect(await balance(me)).toBe(300);
   const entries = await listEntries(makeDeps(env).db, me, { limit: 10 });
   expect(entries.items).toHaveLength(3);
 });
