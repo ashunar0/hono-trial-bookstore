@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
 import { orderStatuses } from "#/domains/order/rules";
+import { exchangeResponseSchema } from "#/routes/exchanges/_response";
 import { returnResponseSchema } from "#/routes/returns/_response";
 
 type OrderRow = typeof ordersTable.$inferSelect;
@@ -55,6 +56,7 @@ const refundSchema = z.object({
 export const orderResponseSchema = orderSummarySchema.extend({
   lines: z.array(lineSchema),
   returns: z.array(returnResponseSchema),
+  exchanges: z.array(exchangeResponseSchema),
   refunds: z.array(refundSchema),
 });
 
@@ -83,6 +85,7 @@ export const orderResponse = (
   lines: LineRow[],
   refunds: RefundRow[],
   returns: z.infer<typeof returnResponseSchema>[],
+  exchanges: z.infer<typeof exchangeResponseSchema>[],
 ): z.infer<typeof orderResponseSchema> => ({
   ...orderSummary(row),
   lines: lines.map((line) => ({
@@ -95,6 +98,7 @@ export const orderResponse = (
     points: line.points,
   })),
   returns,
+  exchanges,
   refunds: refunds.map((refund) => ({
     id: refund.id,
     returnId: refund.returnId,

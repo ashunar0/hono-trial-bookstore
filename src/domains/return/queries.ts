@@ -1,8 +1,14 @@
 import { and, asc, desc, eq, inArray, isNotNull, isNull, lt, ne, or, sql } from "drizzle-orm";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
-import { returnLinesTable, returnsTable, returnWindowsTable } from "#/db/schema";
-import type { ReturnStatus } from "./rules";
+import {
+  exchangeLinesTable,
+  exchangesTable,
+  returnLinesTable,
+  returnsTable,
+  returnWindowsTable,
+} from "#/db/schema";
+import type { ExchangeStatus, ReturnStatus } from "./rules";
 
 export const findReturn = async (db: Db, id: string) => {
   const [row] = await db.select().from(returnsTable).where(eq(returnsTable.id, id)).limit(1);
@@ -23,16 +29,16 @@ export const returnLinesOf = (db: Db, returnIds: string[]) =>
     : db.select().from(returnLinesTable).where(inArray(returnLinesTable.returnId, returnIds));
 
 /**
- * Copies of each of the order's lines in its returns of these statuses. `excluding` leaves one return out.
- * Lines with none are missing
+ * Copies of each of the order's lines in its returns and exchanges of these statuses. `excluding` leaves one return
+ * or one exchange out. Lines with none are missing
  */
-export const returnedCopies = async (
+export const copiesIn = async (
   db: Db,
   orderId: string,
-  statuses: ReturnStatus[],
-  excluding?: string,
+  statuses: { returns: ReturnStatus[]; exchanges: ExchangeStatus[] },
+  excluding?: { returnId: string } | { exchangeId: string },
 ) => {
-  const rows = await db
+  const fromReturns = await db
     .select({
       orderLineId: returnLinesTable.orderLineId,
       copies: sql<number>`sum(${returnLinesTable.quantity})`,
@@ -42,12 +48,34 @@ export const returnedCopies = async (
     .where(
       and(
         eq(returnsTable.orderId, orderId),
-        inArray(returnsTable.status, statuses),
-        excluding === undefined ? undefined : ne(returnsTable.id, excluding),
+        inArray(returnsTable.status, statuses.returns),
+        excluding !== undefined && "returnId" in excluding
+          ? ne(returnsTable.id, excluding.returnId)
+          : undefined,
       ),
     )
     .groupBy(returnLinesTable.orderLineId);
-  return new Map(rows.map((row) => [row.orderLineId, row.copies]));
+  const fromExchanges = await db
+    .select({
+      orderLineId: exchangeLinesTable.orderLineId,
+      copies: sql<number>`sum(${exchangeLinesTable.quantity})`,
+    })
+    .from(exchangeLinesTable)
+    .innerJoin(exchangesTable, eq(exchangesTable.id, exchangeLinesTable.exchangeId))
+    .where(
+      and(
+        eq(exchangesTable.orderId, orderId),
+        inArray(exchangesTable.status, statuses.exchanges),
+        excluding !== undefined && "exchangeId" in excluding
+          ? ne(exchangesTable.id, excluding.exchangeId)
+          : undefined,
+      ),
+    )
+    .groupBy(exchangeLinesTable.orderLineId);
+  const copies = new Map<string, number>();
+  for (const row of [...fromReturns, ...fromExchanges])
+    copies.set(row.orderLineId, (copies.get(row.orderLineId) ?? 0) + row.copies);
+  return copies;
 };
 
 /** Newest first. ?status=requested is what staff still have to decide */
@@ -134,3 +162,53 @@ export const windowsToFinish = (db: Db, limit: number) =>
     )
     .orderBy(asc(returnWindowsTable.pointsClosedAt))
     .limit(limit);
+
+export const findExchange = async (db: Db, id: string) => {
+  const [row] = await db.select().from(exchangesTable).where(eq(exchangesTable.id, id)).limit(1);
+  return row;
+};
+
+/** An order's exchanges, oldest first */
+export const exchangesOf = (db: Db, orderId: string) =>
+  db
+    .select()
+    .from(exchangesTable)
+    .where(eq(exchangesTable.orderId, orderId))
+    .orderBy(asc(exchangesTable.requestedAt), asc(exchangesTable.id));
+
+export const exchangeLinesOf = (db: Db, exchangeIds: string[]) =>
+  exchangeIds.length === 0
+    ? Promise.resolve([])
+    : db
+        .select()
+        .from(exchangeLinesTable)
+        .where(inArray(exchangeLinesTable.exchangeId, exchangeIds));
+
+/** Newest first. customerId narrows it to one customer's; ?status=requested is what staff still have to decide */
+export const listExchanges = async (
+  db: Db,
+  filter: { customerId?: string; status?: ExchangeStatus },
+  query: PageQuery,
+) => {
+  const { after, limit } = query;
+  const rows = await db
+    .select()
+    .from(exchangesTable)
+    .where(
+      and(
+        filter.customerId === undefined
+          ? undefined
+          : eq(exchangesTable.customerId, filter.customerId),
+        filter.status === undefined ? undefined : eq(exchangesTable.status, filter.status),
+        after === undefined
+          ? undefined
+          : or(
+              lt(exchangesTable.requestedAt, after.at),
+              and(eq(exchangesTable.requestedAt, after.at), lt(exchangesTable.id, after.id)),
+            ),
+      ),
+    )
+    .orderBy(desc(exchangesTable.requestedAt), desc(exchangesTable.id))
+    .limit(limit + 1);
+  return toPage(rows, limit, (row) => ({ at: row.requestedAt, id: row.id }));
+};

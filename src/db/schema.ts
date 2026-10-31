@@ -15,7 +15,7 @@ import {
 import { couponKinds } from "#/domains/coupon/rules";
 import { orderStatuses } from "#/domains/order/rules";
 import { pointKinds } from "#/domains/point/rules";
-import { returnStatuses } from "#/domains/return/rules";
+import { exchangeReasons, exchangeStatuses, returnStatuses } from "#/domains/return/rules";
 import { maxAttempts, stockAlertStatuses } from "#/domains/stock-alert/rules";
 
 export * from "./auth-schema";
@@ -340,6 +340,56 @@ export const returnLinesTable = sqliteTable(
   (t) => [
     primaryKey({ columns: [t.returnId, t.orderLineId] }),
     check("return_lines_quantity_positive", sql`${t.quantity} > 0`),
+  ],
+);
+
+/**
+ * A customer asks to swap damaged copies for others of the same books. Staff receive them (a copy is held for the
+ * swap, or the money goes back when none is left), turn the request down, or send the new copy
+ */
+export const exchangesTable = sqliteTable(
+  "exchanges",
+  {
+    id: text("id").primaryKey(),
+    orderId: text("order_id")
+      .notNull()
+      .references(() => ordersTable.id),
+    /** Copied from the order, so a customer's own exchanges are listed without reading order's table */
+    customerId: text("customer_id").notNull(),
+    reason: text("reason", { enum: exchangeReasons }).notNull(),
+    status: text("status", { enum: exchangeStatuses }).notNull(),
+    /** Why staff rejected it */
+    rejectReason: text("reject_reason"),
+    requestedAt: integer("requested_at", { mode: "timestamp_ms" }).notNull(),
+    /** When staff got the damaged copies: received, or refunded when none was left to send */
+    receivedAt: integer("received_at", { mode: "timestamp_ms" }),
+    shippedAt: integer("shipped_at", { mode: "timestamp_ms" }),
+    rejectedAt: integer("rejected_at", { mode: "timestamp_ms" }),
+    /** When the points were put back after refunding. Null on a refunded exchange: the cron finishes it */
+    restoredAt: integer("restored_at", { mode: "timestamp_ms" }),
+    version: integer("version").notNull(),
+  },
+  (t) => [
+    index("exchanges_order").on(t.orderId),
+    index("exchanges_requested_at").on(t.requestedAt, t.id),
+    index("exchanges_customer_requested_at").on(t.customerId, t.requestedAt, t.id),
+  ],
+);
+
+export const exchangeLinesTable = sqliteTable(
+  "exchange_lines",
+  {
+    exchangeId: text("exchange_id")
+      .notNull()
+      .references(() => exchangesTable.id),
+    orderLineId: text("order_line_id")
+      .notNull()
+      .references(() => orderLinesTable.id),
+    quantity: integer("quantity").notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.exchangeId, t.orderLineId] }),
+    check("exchange_lines_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );
 

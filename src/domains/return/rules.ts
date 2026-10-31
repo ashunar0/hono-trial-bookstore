@@ -8,6 +8,19 @@ export const returnStatuses = ["requested", "completed", "rejected"] as const;
 
 export type ReturnStatus = (typeof returnStatuses)[number];
 
+export const exchangeStatuses = [
+  "requested",
+  "received",
+  "shipped",
+  "rejected",
+  "refunded",
+] as const;
+
+export type ExchangeStatus = (typeof exchangeStatuses)[number];
+
+/** Why the copies are sent back: torn or broken, or misprinted (missing or misordered pages) */
+export const exchangeReasons = ["damaged", "defective"] as const;
+
 /** A return is requested within 14 days of shipping */
 export const returnPeriodMs = 14 * 24 * 60 * 60 * 1000;
 
@@ -22,7 +35,11 @@ export const earnBaseOf = (
   returnRefunds: number[],
 ) => order.subtotal - order.discount - returnRefunds.reduce((sum, amount) => sum + amount, 0);
 
-/** How many copies of a line can still be asked back: shipped, less the requested and completed ones */
+/**
+ * How many copies of a line can still be asked back, for a return or an exchange: shipped, less the copies in
+ * returns requested or completed and in exchanges requested, received or refunded. A shipped exchange or a rejected
+ * one is not counted: the customer holds a good copy
+ */
 export const returnableOf = (shipped: number, counted: number) => Math.max(shipped - counted, 0);
 
 /**

@@ -1,7 +1,8 @@
 import type { Db } from "#/db/index";
 import type { ordersTable } from "#/db/schema";
 import { linesOf, refundsOf } from "#/domains/order/index";
-import { returnLinesOf, returnsOf } from "#/domains/return/index";
+import { exchangeLinesOf, exchangesOf, returnLinesOf, returnsOf } from "#/domains/return/index";
+import { exchangeResponse } from "#/routes/exchanges/_response";
 import { returnResponse } from "#/routes/returns/_response";
 import { orderResponse } from "./_response";
 
@@ -12,10 +13,16 @@ export const readOrder = async (db: Db, order: typeof ordersTable.$inferSelect) 
     db,
     returns.map((row) => row.id),
   );
+  const exchanges = await exchangesOf(db, order.id);
+  const exchangeLines = await exchangeLinesOf(
+    db,
+    exchanges.map((row) => row.id),
+  );
   return orderResponse(
     order,
     await linesOf(db, order.id),
     await refundsOf(db, order.id),
     returns.map((row) => returnResponse(row, returnLines)),
+    exchanges.map((row) => exchangeResponse(row, exchangeLines)),
   );
 };

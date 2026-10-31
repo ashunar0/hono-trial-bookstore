@@ -1,7 +1,13 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { updateWithVersion } from "hono-kit/sqlite";
 import type { Db } from "#/db/index";
-import { returnLinesTable, returnsTable, returnWindowsTable } from "#/db/schema";
+import {
+  exchangeLinesTable,
+  exchangesTable,
+  returnLinesTable,
+  returnsTable,
+  returnWindowsTable,
+} from "#/db/schema";
 
 /** The return and its lines. Run in one batch */
 export const insertReturn = (
@@ -43,3 +49,10 @@ export const markPointsEarned = (db: Db, orderId: string, at: Date) =>
     .update(returnWindowsTable)
     .set({ pointsEarnedAt: at })
     .where(and(eq(returnWindowsTable.orderId, orderId), isNull(returnWindowsTable.pointsEarnedAt)));
+
+/** The exchange and its lines. Run in one batch */
+export const insertExchange = (
+  db: Db,
+  row: typeof exchangesTable.$inferInsert,
+  lines: (typeof exchangeLinesTable.$inferInsert)[],
+) => [db.insert(exchangesTable).values(row), db.insert(exchangeLinesTable).values(lines)] as const;

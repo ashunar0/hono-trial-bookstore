@@ -3,5 +3,6 @@ export * from "./queries";
 export * from "./usecases/grantOrderPoints";
 export * from "./usecases/pickOrdersToGrant";
 export * from "./usecases/receiveReturn";
+export * from "./usecases/requestExchange";
 export * from "./usecases/rejectReturn";
 export * from "./usecases/requestReturn";

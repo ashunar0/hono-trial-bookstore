@@ -4,7 +4,7 @@ import { findOrder, linesOf, recordRefund } from "#/domains/order/index";
 import { restorePoints } from "#/domains/point/index";
 import { restoreIdOfReturn } from "#/domains/point/rules";
 import { markReturnRestored, updateReturn } from "../mutations";
-import { findReturn, returnedCopies, returnLinesOf } from "../queries";
+import { findReturn, copiesIn, returnLinesOf } from "../queries";
 import { pointsRefundOf, refundOf, ReturnStatusConflict } from "../rules";
 
 type Input = {
@@ -47,7 +47,12 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
   }
 
   // 2. Copies of each line refunded before this return: the same on a second run, which counts this one out
-  const before = await returnedCopies(db, found.orderId, ["completed"], found.id);
+  const before = await copiesIn(
+    db,
+    found.orderId,
+    { returns: ["completed"], exchanges: [] },
+    { returnId: found.id },
+  );
   let amount = 0;
   let points = 0;
   for (const line of lines) {
