@@ -14,6 +14,7 @@ import {
 } from "drizzle-orm/sqlite-core";
 import { couponKinds } from "#/domains/coupon/rules";
 import { orderStatuses, returnStatuses } from "#/domains/order/rules";
+import { pointKinds } from "#/domains/point/rules";
 
 export * from "./auth-schema";
 
@@ -151,6 +152,37 @@ export const couponUsesTable = sqliteTable(
     uniqueIndex("coupon_uses_once")
       .on(t.couponId, t.customerId)
       .where(sql`status = 'used'`),
+  ],
+);
+
+// ── point ──
+
+/** A customer's points. A customer with no row has none (0): the row is made the first time points are added */
+export const pointBalancesTable = sqliteTable(
+  "point_balances",
+  {
+    customerId: text("customer_id").primaryKey(),
+    balance: integer("balance").notNull(),
+  },
+  (t) => [check("point_balances_not_negative", sql`${t.balance} >= 0`)],
+);
+
+/**
+ * Every change of the balance, by an id the caller made: once per id. amount is negative for a use
+ */
+export const pointEntriesTable = sqliteTable(
+  "point_entries",
+  {
+    id: text("id").primaryKey(),
+    customerId: text("customer_id").notNull(),
+    kind: text("kind", { enum: pointKinds }).notNull(),
+    amount: integer("amount").notNull(),
+    createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+  },
+  (t) => [
+    check("point_entries_amount_not_zero", sql`${t.amount} <> 0`),
+    // A customer's statement, newest first
+    index("point_entries_customer_created_at").on(t.customerId, t.createdAt, t.id),
   ],
 );
 
