@@ -2,12 +2,19 @@ import { createApp } from "hono-kit";
 import { createWorker } from "hono-kit/worker";
 import { makeAuth, sessionUserOf } from "./auth";
 import { wireDb } from "./db/index";
+import { logMailer, type Mailer } from "./lib/mailer";
 import { crons, registerRoutes } from "./routes.gen";
 
 /** What handlers, middleware and jobs read in c.var.deps. Built per request; tests swap parts of it */
-export const makeDeps = (env: Env) => {
+export const makeDeps = (env: Env, overrides: { mailer?: Mailer } = {}) => {
   const auth = makeAuth(env);
-  return { db: wireDb(env.DB), auth, sessionUser: sessionUserOf(auth) };
+  return {
+    db: wireDb(env.DB),
+    auth,
+    sessionUser: sessionUserOf(auth),
+    // No real mail service yet: it logs. Tests pass one that collects what was sent
+    mailer: overrides.mailer ?? logMailer,
+  };
 };
 
 export const buildApp = (deps = makeDeps, clock?: () => Date) => {
