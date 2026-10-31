@@ -7,7 +7,7 @@ import { registerStockAlert, sendStockAlert } from "#/domains/stock-alert/index"
 import { collectingMailer, downMailer, type Mail, type Mailer } from "#/lib/mailer";
 import { makeDeps } from "#/main";
 import { carol, db, request, someone } from "../../test/fixtures";
-import { bookWith } from "../routes/orders/_test-helpers";
+import { bookWith } from "../../test/helpers";
 import { cron } from "./send-stock-alerts";
 
 const t0 = new Date("2026-11-15T10:00:00+09:00");

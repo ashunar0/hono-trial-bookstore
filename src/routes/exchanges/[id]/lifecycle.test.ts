@@ -17,7 +17,7 @@ import {
   stockOf,
   withPoints,
   type Order,
-} from "../../orders/_test-helpers";
+} from "../../../../test/helpers";
 
 type Exchange = { id: string; status: string; rejectReason: string | null };
 

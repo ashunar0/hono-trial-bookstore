@@ -13,7 +13,7 @@ import {
   put,
   withPoints,
   type Order,
-} from "../../_test-helpers";
+} from "../../../../../test/helpers";
 
 /** Places with points, pays and ships (in November) */
 const shippedWithPoints = async (who: ReturnType<typeof someone>, points?: number) => {

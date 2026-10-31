@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { carol, request, someone } from "../../../test/fixtures";
-import { bookWith, fixed500, place, put, stockOf, type Order } from "./_test-helpers";
+import { bookWith, fixed500, place, put, stockOf, type Order } from "../../../test/helpers";
 
 it("places the cart as an order: the design's fixed coupon example", async () => {
   const me = someone();

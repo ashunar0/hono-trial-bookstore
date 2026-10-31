@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
 import { stockAlertsTable } from "#/db/schema";
 import { carol, db, request, someone } from "../../../test/fixtures";
-import { bookWith } from "../orders/_test-helpers";
+import { bookWith } from "../../../test/helpers";
 
 type Alert = {
   id: string;

@@ -16,7 +16,7 @@ import {
   stockOf,
   withPoints,
   type Order,
-} from "../_test-helpers";
+} from "../../../../test/helpers";
 
 const cancel = (who: Parameters<typeof request>[0], order: Order) =>
   request(who, "POST", `/orders/${order.id}/cancel`, { version: order.version }, inNovember);

@@ -11,7 +11,7 @@ import {
   stockOf,
   withPoints,
   type Order,
-} from "./_test-helpers";
+} from "../../../test/helpers";
 
 const rowOf = async (id: string) => {
   const [order] = await db().select().from(ordersTable).where(eq(ordersTable.id, id));

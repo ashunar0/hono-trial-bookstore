@@ -13,7 +13,7 @@ import {
   shippedOrder,
   stockOf,
   type Order,
-} from "../../../routes/orders/_test-helpers";
+} from "../../../../test/helpers";
 import { reserveStock } from "#/domains/inventory/index";
 import { reservationIdOfExchange } from "../rules";
 import { receiveExchange } from "./receiveExchange";

@@ -15,7 +15,7 @@ import {
   shippedOrder,
   stockOf,
   type Order,
-} from "../routes/orders/_test-helpers";
+} from "../../test/helpers";
 import { cron } from "./sweep-orders";
 
 const sweep = (now: Date) => cron.run({ deps: makeDeps(env), now });

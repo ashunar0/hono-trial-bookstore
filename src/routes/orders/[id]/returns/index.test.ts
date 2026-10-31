@@ -8,7 +8,7 @@ import {
   shippedOrder,
   stockOf,
   type Order,
-} from "../../_test-helpers";
+} from "../../../../../test/helpers";
 
 type Return = { id: string; status: string; lines: { orderLineId: string; quantity: number }[] };
 

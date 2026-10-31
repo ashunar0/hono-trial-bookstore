@@ -16,7 +16,7 @@ import {
   shippedOrder,
   withPoints,
   type Order,
-} from "../../../routes/orders/_test-helpers";
+} from "../../../../test/helpers";
 import { grantOrderPoints } from "./grantOrderPoints";
 
 // Shipped 2026-11-15 10:00 +09:00: returns are taken until 2026-11-29 10:00 +09:00

@@ -7,7 +7,7 @@ import { makeDeps } from "#/main";
 import { insertReturnIfWon, updateWindow } from "../mutations";
 import { env } from "cloudflare:workers";
 import { db, request, someone } from "../../../../test/fixtures";
-import { bookWith, inNovember, put, shippedOrder } from "../../../routes/orders/_test-helpers";
+import { bookWith, inNovember, put, shippedOrder } from "../../../../test/helpers";
 
 const refundsOf = (orderId: string) =>
   db().select().from(refundsTable).where(eq(refundsTable.orderId, orderId));

@@ -6,7 +6,7 @@ import { cancelOrder } from "#/domains/order/index";
 import { makeDeps } from "#/main";
 import { env } from "cloudflare:workers";
 import { db, request, someone } from "../../../../test/fixtures";
-import { bookWith, inNovember, placedOrder } from "../../../routes/orders/_test-helpers";
+import { bookWith, inNovember, placedOrder } from "../../../../test/helpers";
 
 const refundsOf = (orderId: string) =>
   db().select().from(refundsTable).where(eq(refundsTable.orderId, orderId));

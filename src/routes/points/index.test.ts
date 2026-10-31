@@ -4,7 +4,7 @@ import { expect, it } from "vitest";
 import { earnPoints, usePoints } from "#/domains/point/index";
 import { makeDeps } from "#/main";
 import { carol, request, someone } from "../../../test/fixtures";
-import { bookWith, inNovember, place, put, withPoints, type Order } from "../orders/_test-helpers";
+import { bookWith, inNovember, place, put, withPoints, type Order } from "../../../test/helpers";
 
 type Entry = { id: string; kind: string; amount: number; createdAt: string };
 

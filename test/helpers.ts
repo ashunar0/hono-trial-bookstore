@@ -2,7 +2,7 @@ import { env } from "cloudflare:workers";
 import { userId, type SessionUser } from "hono-kit";
 import { balanceOf, earnPoints } from "#/domains/point/index";
 import { makeDeps } from "#/main";
-import { carol, request } from "../../../test/fixtures";
+import { carol, request } from "./fixtures";
 
 export const inNovember = new Date("2026-11-15T10:00:00+09:00");
 

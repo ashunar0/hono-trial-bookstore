@@ -9,7 +9,7 @@ import {
   put,
   stockOf,
   type Order,
-} from "../_test-helpers";
+} from "../../../../test/helpers";
 
 const at = (iso: string) => new Date(iso);
 const pay = (who: Parameters<typeof request>[0], id: string, when = inNovember) =>

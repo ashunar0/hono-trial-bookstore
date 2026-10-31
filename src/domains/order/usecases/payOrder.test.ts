@@ -3,14 +3,7 @@ import { userId } from "hono-kit";
 import { expect, it } from "vitest";
 import { makeDeps } from "#/main";
 import { someone } from "../../../../test/fixtures";
-import {
-  bookWith,
-  inNovember,
-  place,
-  put,
-  withPoints,
-  type Order,
-} from "../../../routes/orders/_test-helpers";
+import { bookWith, inNovember, place, put, withPoints, type Order } from "../../../../test/helpers";
 import { payOrder } from "./payOrder";
 
 const payWith = async (points: number | undefined) => {

@@ -5,7 +5,7 @@ import { expect, it } from "vitest";
 import { stockAlertsTable } from "#/db/schema";
 import { makeDeps } from "#/main";
 import { db, someone } from "../../../../test/fixtures";
-import { bookWith } from "../../../routes/orders/_test-helpers";
+import { bookWith } from "../../../../test/helpers";
 import { cancelStockAlert } from "./cancelStockAlert";
 import { registerStockAlert } from "./registerStockAlert";
 
