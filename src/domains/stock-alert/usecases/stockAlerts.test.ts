@@ -3,11 +3,14 @@ import { eq } from "drizzle-orm";
 import { userId } from "hono-kit";
 import { expect, it } from "vitest";
 import { stockAlertsTable } from "#/db/schema";
+import { downMailer } from "#/lib/mailer";
 import { makeDeps } from "#/main";
-import { db, someone } from "../../../../test/fixtures";
+import { carol, db, request, someone } from "../../../../test/fixtures";
 import { bookWith } from "../../../../test/helpers";
+import { pauseBefore } from "../../../../test/interleave";
 import { cancelStockAlert } from "./cancelStockAlert";
 import { registerStockAlert } from "./registerStockAlert";
+import { sendStockAlert } from "./sendStockAlert";
 
 const deps = makeDeps(env);
 const now = new Date("2026-11-15T10:00:00+09:00");
@@ -129,4 +132,31 @@ it("another customer's alert is not cancelled by someone else", async () => {
 
   expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
   expect(await rowOf(created.value.id)).toBeDefined();
+});
+
+it("a cancel that read the alert as waiting loses to the cron that starts sending it meanwhile: 409, and the alert is kept", async () => {
+  const me = someone();
+  const book = await bookWith(1000, 0);
+  const asked = await ask(me, book);
+  if (!asked.ok) throw new Error("not registered");
+  await request(carol, "PUT", `/books/${book}/stock`, { quantity: 3, version: 1 });
+
+  let sent: Awaited<ReturnType<typeof sendStockAlert>> | undefined;
+  const DB = pauseBefore(env.DB, /^delete from "stock_alerts"/, async () => {
+    sent = await sendStockAlert(makeDeps(env, { mailer: downMailer() }), {
+      id: asked.value.id,
+      now,
+    });
+  });
+  const cancelled = await cancelStockAlert(makeDeps({ ...env, DB }), {
+    customerId: userId(me.id),
+    bookId: book,
+  });
+
+  expect(sent).toMatchObject({ ok: true, value: { outcome: "retry" } });
+  expect(cancelled).toMatchObject({
+    ok: false,
+    error: { code: "STOCK_ALERT_STATUS_CONFLICT", details: { status: "sending" } },
+  });
+  expect((await rowOf(asked.value.id))?.status).toBe("sending");
 });
