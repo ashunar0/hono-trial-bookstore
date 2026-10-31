@@ -24,6 +24,6 @@ export const POST = createEndpoint(
     });
     if (!result.ok) return reply.failure(result.error);
 
-    return reply.success(await readOrder(c.var.deps.db, result.value));
+    return reply.success(await readOrder(c.var.deps.db, result.value.order));
   },
 );

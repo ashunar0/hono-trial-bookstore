@@ -12,3 +12,7 @@
 - QUESTION: 使ったポイントを戻すとき、order は「使った量」を渡すのか、point が使用 id から読むのか。使う前に確定が止まった注文（cron が「確定中」からキャンセルする）で、order が量を渡す形だと、使っていないポイントが戻って湧いてしまう。おすすめの方で進めた: 注文まるごとの戻し（キャンセル・確定の取り消し）は `restorePointsOfUse(useId)` にして、point が使用の履歴の行から量を読む（無ければ何もしない）。返品の一部は order が量を渡す `restorePoints`（戻しの id は返品 id から決まる）。設計書の usecase 名は「戻す」の 1 つだが、2 つに分けた。
 - QUESTION: 確定が「支払い済み」で終わる（全部ポイント）とき、`paidAt` を確定の時刻にした。設計書に書いていなかった。
 - QUESTION: orders の `earn_id`（貯める id）は nullable にした。NOT NULL で足す列に既定値が無いと、SQLite は ALTER TABLE ADD COLUMN を受けつけない（空の表でも）。ポイントができる前の注文は null で、貯める cron は飛ばす。設計書は「貯める id も作って保存」とだけある。
+
+## 支払いの額（段 3）
+
+- QUESTION: このアプリには支払い API の呼び出しが無い（`pay` は「支払った」ことにするだけ）。「支払い API に渡す額 ＝ 合計 − 使ったポイント」をどこに出すか書いていなかった。おすすめの方で進めた: `amountToPay`（order/rules.ts）で計算し、`payOrder` が `{ order, charged }` で返す。HTTP のレスポンスには出さない（注文の `total` と `pointsUsed` から計算できる）。本物の決済をつなぐときは `charged` を渡す。
