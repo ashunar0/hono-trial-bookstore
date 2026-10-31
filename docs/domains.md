@@ -23,7 +23,7 @@ A domain has only the kinds it has something to put in: no empty files (a domain
 3. Only writes → `mutations.ts`
 4. Anything else (reads and writes, reads another domain, uses deps, decides from what it read) → `usecases/<verb>.ts`, in the domain that owns the table it writes
 
-A read that needs several domains and writes nothing (a list with a flag from another domain, a summary) is put together in the route: it calls each domain's queries and combines the results. It is not a usecase, since a usecase is for a write.
+An entry point (a route, or the handler of a cron, a queue or a webhook) stays thin: it calls queries and usecases. What it may put together itself is only a read that makes its response: it calls each domain's queries and combines the results into one response (a list with a flag from another domain, a summary). A read whose result is used to write, send or decide (which alerts to send now) is a usecase, even when it begins by reading another domain. A cron or a queue returns no response, so in practice only routes put reads together.
 
 What goes in `queries.ts` is decided by what the domain needs, not by what a response needs. Reading an order with its returns and refunds together belongs there when a usecase decides from it (how much can still be refunded); when only a response shows them together, it does not.
 
