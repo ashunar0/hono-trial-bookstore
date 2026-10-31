@@ -1,13 +1,14 @@
 import { err, ok, type DepsVariables, type UserId } from "hono-kit";
 import { findBooks } from "#/domains/book/index";
 import { cartItemsOf, emptyCart } from "#/domains/cart/index";
-import { findCouponByCode, releaseCouponUse, useCoupon } from "#/domains/coupon/index";
+import { findCouponByCode, useCoupon } from "#/domains/coupon/index";
 import { CouponNotApplicable } from "#/domains/coupon/rules";
-import { releaseReservation, reserveStock } from "#/domains/inventory/index";
+import { reserveStock } from "#/domains/inventory/index";
 import { usePoints } from "#/domains/point/index";
 import { priceCart } from "#/domains/pricing/rules";
-import { deleteOrder, insertOrder, updateOrder } from "../mutations";
+import { insertOrder, updateOrder } from "../mutations";
 import { findOrder } from "../queries";
+import { abandon } from "./_abandon";
 import { giveBack } from "./_giveBack";
 import {
   CartEmpty,
@@ -32,7 +33,8 @@ type Input = {
  * 1 the order as placing, with the ids of the hold, the coupon use, the point use and the earning made here →
  * 2 hold the stock → 3 use the coupon → 4 use the points → 5 awaiting_payment (paid at once when the points
  * cover the whole total: nothing is left for the card) → 6 empty the cart.
- * Failing at 2, 3 or 4 takes back what was done and deletes the order. Stopping halfway (the Worker dies) leaves
+ * Failing at 2, 3 or 4 abandons the order: everything is given back (a step not reached gives back nothing) and the
+ * order is deleted. Stopping halfway (the Worker dies) leaves
  * a placing order with its ids, and the cron cancels it with them.
  * CART_EMPTY → COUPON_NOT_APPLICABLE → POINTS_EXCEED_TOTAL → OUT_OF_STOCK → COUPON_ALREADY_USED → POINTS_INSUFFICIENT
  */
@@ -102,10 +104,7 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
 
   // 2
   const held = await reserveStock(deps, { reservationId: order.reservationId, lines, now });
-  if (!held.ok) {
-    await db.batch(deleteOrder(db, order.id));
-    return held;
-  }
+  if (!held.ok) return abandon(deps, order, held, now);
 
   // 3
   if (coupon !== undefined && order.couponUseId !== null) {
@@ -115,11 +114,7 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
       customerId,
       now,
     });
-    if (!used.ok) {
-      await releaseReservation(deps, { reservationId: order.reservationId, now });
-      await db.batch(deleteOrder(db, order.id));
-      return used;
-    }
+    if (!used.ok) return abandon(deps, order, used, now);
   }
 
   // 4
@@ -130,13 +125,7 @@ export const placeOrder = async (deps: DepsVariables["deps"], input: Input) => {
       points,
       now,
     });
-    if (!spent.ok) {
-      if (order.couponUseId !== null)
-        await releaseCouponUse(deps, { useId: order.couponUseId, now });
-      await releaseReservation(deps, { reservationId: order.reservationId, now });
-      await db.batch(deleteOrder(db, order.id));
-      return spent;
-    }
+    if (!spent.ok) return abandon(deps, order, spent, now);
   }
 
   // 5. Only the cron touches a placing order, and only after 10 minutes. Nothing left for the card: paid, and the
