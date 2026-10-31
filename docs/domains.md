@@ -1,6 +1,6 @@
 # Domains
 
-<!-- The original of this page and lint/domains.mjs is ~/dev/hono/hono-trials/kakeibo. Other projects copy both from there: change them there first, then copy again. -->
+<!-- Copied from hono-kit's presets/domains (https://github.com/ashunar0/hono-kit/tree/main/presets/domains). Change it there first, then copy again. -->
 
 The business rules live in `src/domains/<noun>/`, outside the routes. Every domain draws from the same list of file kinds below, and **what a file imports decides which kind it is**, so where a function goes is never a judgment of size. Between domains the rules are those of a modular monolith: one app and one database, split into domains that touch each other only through what each one publishes. `lint/domains.mjs` (rule `domains/imports`) stops an import that breaks the tables below.
 

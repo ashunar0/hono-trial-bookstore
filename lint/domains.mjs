@@ -1,6 +1,7 @@
 /**
  * src/domains の置き場所を、何を import するかで守らせる oxlint のプラグイン（試し）。
  * 決まりは docs/domains.md。ここは止めるだけで、なぜかは docs に書く
+ * 元は hono-kit の presets/domains。直すならそこで直して写し直す
  */
 import fs from "node:fs";
 import path from "node:path";
