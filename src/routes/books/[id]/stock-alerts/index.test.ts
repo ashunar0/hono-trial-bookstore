@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { expect, it } from "vitest";
-import { restockAlertsTable } from "#/db/schema";
+import { stockAlertsTable } from "#/db/schema";
 import { carol, db, request, someone } from "../../../../../test/fixtures";
 import { bookWith, put } from "../../../orders/_test-helpers";
 
@@ -13,7 +13,7 @@ type Alert = {
 };
 
 const at = new Date("2026-11-15T10:00:00+09:00");
-const path = (book: string) => `/books/${book}/restock-alerts`;
+const path = (book: string) => `/books/${book}/stock-alerts`;
 
 it("POST registers an alert on a book with no stock", async () => {
   const me = someone();
@@ -65,20 +65,20 @@ it("DELETE cancels a waiting alert; asking after that makes a new one", async ()
   expect(again.id).not.toBe(first.id);
 });
 
-it("DELETE is 409 RESTOCK_ALERT_STATUS_CONFLICT with the status once it is sending", async () => {
+it("DELETE is 409 STOCK_ALERT_STATUS_CONFLICT with the status once it is sending", async () => {
   const me = someone();
   const book = await bookWith(1000, 0);
   const alert = (await (await request(me, "POST", path(book))).json()) as Alert;
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sending", attempts: 1 })
-    .where(eq(restockAlertsTable.id, alert.id));
+    .where(eq(stockAlertsTable.id, alert.id));
 
   const res = await request(me, "DELETE", path(book));
 
   expect(res.status).toBe(409);
   expect(await res.json()).toMatchObject({
-    error: { code: "RESTOCK_ALERT_STATUS_CONFLICT", details: { status: "sending" } },
+    error: { code: "STOCK_ALERT_STATUS_CONFLICT", details: { status: "sending" } },
   });
 });
 

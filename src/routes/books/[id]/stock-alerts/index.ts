@@ -1,9 +1,9 @@
 import { z } from "zod";
 import { createEndpoint, errorResponses, NotFound } from "hono-kit";
 import { requireRole } from "#/auth";
-import { cancelRestockAlert, registerRestockAlert } from "#/domains/restock/index";
-import { RestockAlertStatusConflict, StockAvailable } from "#/domains/restock/rules";
-import { alertResponse, alertResponseSchema } from "../../../restock-alerts/_response";
+import { cancelStockAlert, registerStockAlert } from "#/domains/stock-alert/index";
+import { StockAlertStatusConflict, StockAvailable } from "#/domains/stock-alert/rules";
+import { alertResponse, alertResponseSchema } from "../../../stock-alerts/_response";
 
 const param = z.object({ id: z.string() });
 
@@ -19,7 +19,7 @@ export const POST = createEndpoint(
   },
   async (c, reply) => {
     const customer = c.var.currentUser;
-    const result = await registerRestockAlert(c.var.deps, {
+    const result = await registerStockAlert(c.var.deps, {
       customerId: customer.id,
       email: customer.email,
       bookId: c.req.valid("param").id,
@@ -38,11 +38,11 @@ export const DELETE = createEndpoint(
     request: { param },
     responses: {
       200: z.object({ ok: z.literal(true) }),
-      ...errorResponses(NotFound, RestockAlertStatusConflict),
+      ...errorResponses(NotFound, StockAlertStatusConflict),
     },
   },
   async (c, reply) => {
-    const result = await cancelRestockAlert(c.var.deps, {
+    const result = await cancelStockAlert(c.var.deps, {
       customerId: c.var.currentUser.id,
       bookId: c.req.valid("param").id,
     });

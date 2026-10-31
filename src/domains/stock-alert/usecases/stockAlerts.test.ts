@@ -2,21 +2,21 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { userId } from "hono-kit";
 import { expect, it } from "vitest";
-import { restockAlertsTable } from "#/db/schema";
+import { stockAlertsTable } from "#/db/schema";
 import { makeDeps } from "#/main";
 import { db, someone } from "../../../../test/fixtures";
 import { bookWith } from "../../../routes/orders/_test-helpers";
-import { cancelRestockAlert } from "./cancelRestockAlert";
-import { registerRestockAlert } from "./registerRestockAlert";
+import { cancelStockAlert } from "./cancelStockAlert";
+import { registerStockAlert } from "./registerStockAlert";
 
 const deps = makeDeps(env);
 const now = new Date("2026-11-15T10:00:00+09:00");
 
 const ask = (who: ReturnType<typeof someone>, bookId: string) =>
-  registerRestockAlert(deps, { customerId: userId(who.id), email: who.email, bookId, now });
+  registerStockAlert(deps, { customerId: userId(who.id), email: who.email, bookId, now });
 
 const rowOf = async (id: string) => {
-  const [row] = await db().select().from(restockAlertsTable).where(eq(restockAlertsTable.id, id));
+  const [row] = await db().select().from(stockAlertsTable).where(eq(stockAlertsTable.id, id));
   return row;
 };
 
@@ -54,8 +54,8 @@ it("asking again returns the same alert, also when two asks come at once", async
   expect(a.ok && b.ok && a.value.id === b.value.id).toBe(true);
   const rows = await db()
     .select()
-    .from(restockAlertsTable)
-    .where(eq(restockAlertsTable.customerId, me2.id));
+    .from(stockAlertsTable)
+    .where(eq(stockAlertsTable.customerId, me2.id));
   expect(rows).toHaveLength(1);
 });
 
@@ -65,9 +65,9 @@ it("keeps an alert that is already sending when asked again, even with the book 
   const first = await ask(me, book);
   if (!first.ok) throw new Error("not registered");
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sending", attempts: 1 })
-    .where(eq(restockAlertsTable.id, first.value.id));
+    .where(eq(stockAlertsTable.id, first.value.id));
 
   const again = await ask(me, book);
 
@@ -80,9 +80,9 @@ it("can be asked again once the alert is sent", async () => {
   const first = await ask(me, book);
   if (!first.ok) throw new Error("not registered");
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sent", attempts: 1, sentAt: now })
-    .where(eq(restockAlertsTable.id, first.value.id));
+    .where(eq(stockAlertsTable.id, first.value.id));
 
   const again = await ask(me, book);
 
@@ -96,12 +96,12 @@ it("cancels a waiting alert by deleting it; 404 when there is none; 409 while se
   const created = await ask(me, book);
   if (!created.ok) throw new Error("not registered");
 
-  expect(await cancelRestockAlert(deps, { customerId: userId(me.id), bookId: book })).toEqual({
+  expect(await cancelStockAlert(deps, { customerId: userId(me.id), bookId: book })).toEqual({
     ok: true,
     value: { id: created.value.id },
   });
   expect(await rowOf(created.value.id)).toBeUndefined();
-  expect(await cancelRestockAlert(deps, { customerId: userId(me.id), bookId: book })).toEqual({
+  expect(await cancelStockAlert(deps, { customerId: userId(me.id), bookId: book })).toEqual({
     ok: false,
     error: "NOT_FOUND",
   });
@@ -109,12 +109,12 @@ it("cancels a waiting alert by deleting it; 404 when there is none; 409 while se
   const sending = await ask(me, book);
   if (!sending.ok) throw new Error("not registered");
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sending", attempts: 1 })
-    .where(eq(restockAlertsTable.id, sending.value.id));
-  expect(await cancelRestockAlert(deps, { customerId: userId(me.id), bookId: book })).toEqual({
+    .where(eq(stockAlertsTable.id, sending.value.id));
+  expect(await cancelStockAlert(deps, { customerId: userId(me.id), bookId: book })).toEqual({
     ok: false,
-    error: { code: "RESTOCK_ALERT_STATUS_CONFLICT", details: { status: "sending" } },
+    error: { code: "STOCK_ALERT_STATUS_CONFLICT", details: { status: "sending" } },
   });
   expect(await rowOf(sending.value.id)).toBeDefined();
 });
@@ -125,7 +125,7 @@ it("another customer's alert is not cancelled by someone else", async () => {
   const created = await ask(mine, book);
   if (!created.ok) throw new Error("not registered");
 
-  const result = await cancelRestockAlert(deps, { customerId: userId(someone().id), bookId: book });
+  const result = await cancelStockAlert(deps, { customerId: userId(someone().id), bookId: book });
 
   expect(result).toEqual({ ok: false, error: "NOT_FOUND" });
   expect(await rowOf(created.value.id)).toBeDefined();

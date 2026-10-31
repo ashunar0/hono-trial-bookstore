@@ -1,6 +1,6 @@
 import { createEndpoint, pageQuerySchema, pageResponse, pageResponseSchema } from "hono-kit";
 import { requireRole } from "#/auth";
-import { listAlerts } from "#/domains/restock/index";
+import { listAlerts } from "#/domains/stock-alert/index";
 import { alertResponse, alertResponseSchema } from "./_response";
 
 /** The customer's own alerts, whatever their status (waiting, sending, sent, failed), newest first */

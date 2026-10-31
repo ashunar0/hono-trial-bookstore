@@ -15,7 +15,7 @@ import {
 import { couponKinds } from "#/domains/coupon/rules";
 import { orderStatuses, returnStatuses } from "#/domains/order/rules";
 import { pointKinds } from "#/domains/point/rules";
-import { maxAttempts, restockAlertStatuses } from "#/domains/restock/rules";
+import { maxAttempts, stockAlertStatuses } from "#/domains/stock-alert/rules";
 
 export * from "./auth-schema";
 
@@ -344,14 +344,14 @@ export const refundsTable = sqliteTable("refunds", {
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 
-// ── restock ──
+// ── stock-alert ──
 
 /**
  * "Tell me when this book is back". Its id is also the key of the mail, so a mail sent twice is one mail to the other
  * side. Cancelling deletes the row (only while waiting)
  */
-export const restockAlertsTable = sqliteTable(
-  "restock_alerts",
+export const stockAlertsTable = sqliteTable(
+  "stock_alerts",
   {
     id: text("id").primaryKey(),
     customerId: text("customer_id").notNull(),
@@ -360,7 +360,7 @@ export const restockAlertsTable = sqliteTable(
       .references(() => booksTable.id),
     /** Where the mail goes: the customer's address when they asked, since the cron has no session to read it from */
     email: text("email").notNull(),
-    status: text("status", { enum: restockAlertStatuses }).notNull(),
+    status: text("status", { enum: stockAlertStatuses }).notNull(),
     /** How many times the mail was tried. Counted before the mail is called */
     attempts: integer("attempts").notNull(),
     createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
@@ -368,16 +368,16 @@ export const restockAlertsTable = sqliteTable(
   },
   (t) => [
     check(
-      "restock_alerts_attempts",
+      "stock_alerts_attempts",
       sql`${t.attempts} between 0 and ${sql.raw(String(maxAttempts))}`,
     ),
     // One alert still to be sent per customer and book. A sent or failed one does not count, so they can ask again
-    uniqueIndex("restock_alerts_open")
+    uniqueIndex("stock_alerts_open")
       .on(t.customerId, t.bookId)
       .where(sql`status in ('waiting', 'sending')`),
     // A customer's list, newest first
-    index("restock_alerts_customer_created_at").on(t.customerId, t.createdAt, t.id),
+    index("stock_alerts_customer_created_at").on(t.customerId, t.createdAt, t.id),
     // What the cron picks up by status
-    index("restock_alerts_status").on(t.status, t.createdAt),
+    index("stock_alerts_status").on(t.status, t.createdAt),
   ],
 );

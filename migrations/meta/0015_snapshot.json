@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "0a70dd18-90c1-44c5-8e07-51e108fff6da",
+  "id": "9d2ef7af-0d06-4561-acc5-7c3059caaf9f",
   "prevId": "4d996859-dd10-4efa-acac-9c542731c808",
   "tables": {
     "books": {
@@ -924,118 +924,6 @@
       "uniqueConstraints": {},
       "checkConstraints": {}
     },
-    "restock_alerts": {
-      "name": "restock_alerts",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "text",
-          "primaryKey": true,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "customer_id": {
-          "name": "customer_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "book_id": {
-          "name": "book_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "email": {
-          "name": "email",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "attempts": {
-          "name": "attempts",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "autoincrement": false
-        },
-        "sent_at": {
-          "name": "sent_at",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": false,
-          "autoincrement": false
-        }
-      },
-      "indexes": {
-        "restock_alerts_open": {
-          "name": "restock_alerts_open",
-          "columns": [
-            "customer_id",
-            "book_id"
-          ],
-          "isUnique": true,
-          "where": "status in ('waiting', 'sending')"
-        },
-        "restock_alerts_customer_created_at": {
-          "name": "restock_alerts_customer_created_at",
-          "columns": [
-            "customer_id",
-            "created_at",
-            "id"
-          ],
-          "isUnique": false
-        },
-        "restock_alerts_status": {
-          "name": "restock_alerts_status",
-          "columns": [
-            "status",
-            "created_at"
-          ],
-          "isUnique": false
-        }
-      },
-      "foreignKeys": {
-        "restock_alerts_book_id_books_id_fk": {
-          "name": "restock_alerts_book_id_books_id_fk",
-          "tableFrom": "restock_alerts",
-          "tableTo": "books",
-          "columnsFrom": [
-            "book_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "no action",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "checkConstraints": {
-        "restock_alerts_attempts": {
-          "name": "restock_alerts_attempts",
-          "value": "\"restock_alerts\".\"attempts\" between 0 and 3"
-        }
-      }
-    },
     "restock_lines": {
       "name": "restock_lines",
       "columns": {
@@ -1304,6 +1192,118 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "checkConstraints": {}
+    },
+    "stock_alerts": {
+      "name": "stock_alerts",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "text",
+          "primaryKey": true,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "customer_id": {
+          "name": "customer_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "book_id": {
+          "name": "book_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "attempts": {
+          "name": "attempts",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "autoincrement": false
+        },
+        "sent_at": {
+          "name": "sent_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        }
+      },
+      "indexes": {
+        "stock_alerts_open": {
+          "name": "stock_alerts_open",
+          "columns": [
+            "customer_id",
+            "book_id"
+          ],
+          "isUnique": true,
+          "where": "status in ('waiting', 'sending')"
+        },
+        "stock_alerts_customer_created_at": {
+          "name": "stock_alerts_customer_created_at",
+          "columns": [
+            "customer_id",
+            "created_at",
+            "id"
+          ],
+          "isUnique": false
+        },
+        "stock_alerts_status": {
+          "name": "stock_alerts_status",
+          "columns": [
+            "status",
+            "created_at"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "stock_alerts_book_id_books_id_fk": {
+          "name": "stock_alerts_book_id_books_id_fk",
+          "tableFrom": "stock_alerts",
+          "tableTo": "books",
+          "columnsFrom": [
+            "book_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "checkConstraints": {
+        "stock_alerts_attempts": {
+          "name": "stock_alerts_attempts",
+          "value": "\"stock_alerts\".\"attempts\" between 0 and 3"
+        }
+      }
     },
     "stocks": {
       "name": "stocks",

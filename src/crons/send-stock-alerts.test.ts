@@ -2,13 +2,13 @@ import { env } from "cloudflare:workers";
 import { eq } from "drizzle-orm";
 import { userId } from "hono-kit";
 import { expect, it } from "vitest";
-import { restockAlertsTable } from "#/db/schema";
-import { registerRestockAlert, sendRestockAlert } from "#/domains/restock/index";
+import { stockAlertsTable } from "#/db/schema";
+import { registerStockAlert, sendStockAlert } from "#/domains/stock-alert/index";
 import { collectingMailer, downMailer, type Mail, type Mailer } from "#/lib/mailer";
 import { makeDeps } from "#/main";
 import { carol, db, request, someone } from "../../test/fixtures";
 import { bookWith } from "../routes/orders/_test-helpers";
-import { cron } from "./send-restock-alerts";
+import { cron } from "./send-stock-alerts";
 
 const t0 = new Date("2026-11-15T10:00:00+09:00");
 const minutes = (n: number) => new Date(t0.getTime() + n * 60_000);
@@ -17,7 +17,7 @@ const run = (mailer: Mailer, now: Date) => cron.run({ deps: makeDeps(env, { mail
 
 /** Asks to be told about the book, as the API does */
 const ask = async (who: ReturnType<typeof someone>, bookId: string) => {
-  const result = await registerRestockAlert(makeDeps(env), {
+  const result = await registerStockAlert(makeDeps(env), {
     customerId: userId(who.id),
     email: who.email,
     bookId,
@@ -38,7 +38,7 @@ const setStock = async (bookId: string, quantity: number) => {
 };
 
 const rowOf = async (id: string) => {
-  const [row] = await db().select().from(restockAlertsTable).where(eq(restockAlertsTable.id, id));
+  const [row] = await db().select().from(stockAlertsTable).where(eq(stockAlertsTable.id, id));
   return row!;
 };
 
@@ -80,9 +80,9 @@ it("an old alert on a book still out of stock does not hold back a newer one on 
   const back = await ask(someone(), backBook);
   await setStock(backBook, 4);
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ createdAt: new Date(t0.getTime() + 1000) })
-    .where(eq(restockAlertsTable.id, back.id));
+    .where(eq(stockAlertsTable.id, back.id));
   const outbox: Mail[] = [];
 
   await run(collectingMailer(outbox), minutes(15));
@@ -97,7 +97,7 @@ it("a waiting alert whose book ran out again before the mail is left waiting (th
   const alert = await ask(someone(), book);
   const outbox: Mail[] = [];
 
-  const result = await sendRestockAlert(makeDeps(env, { mailer: collectingMailer(outbox) }), {
+  const result = await sendStockAlert(makeDeps(env, { mailer: collectingMailer(outbox) }), {
     id: alert.id,
     now: minutes(15),
   });
@@ -111,9 +111,9 @@ it("one that is already sending is sent whatever the stock is", async () => {
   const book = await bookWith(1000, 0);
   const alert = await ask(someone(), book);
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sending", attempts: 1 })
-    .where(eq(restockAlertsTable.id, alert.id));
+    .where(eq(stockAlertsTable.id, alert.id));
   const outbox: Mail[] = [];
 
   await run(collectingMailer(outbox), minutes(15));
@@ -126,9 +126,9 @@ it("a mailer that is down: three runs are three attempts, then it is given up, a
   const book = await bookWith(1000, 2);
   const alert = await ask(someone(), await bookWith(1000, 0));
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ bookId: book })
-    .where(eq(restockAlertsTable.id, alert.id));
+    .where(eq(stockAlertsTable.id, alert.id));
 
   await run(downMailer(), minutes(15));
   expect(await rowOf(alert.id)).toMatchObject({ status: "sending", attempts: 1 });
@@ -160,9 +160,9 @@ it("a run that died after calling the mailer is sent again, and the mailer side 
   const book = await bookWith(1000, 3);
   const alert = await ask(someone(), await bookWith(1000, 0));
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ bookId: book })
-    .where(eq(restockAlertsTable.id, alert.id));
+    .where(eq(stockAlertsTable.id, alert.id));
   const outbox: Mail[] = [];
   // The first run: recorded sending, the mail went, then it died before closing
   await collectingMailer(outbox).send({
@@ -172,9 +172,9 @@ it("a run that died after calling the mailer is sent again, and the mailer side 
     body: "b",
   });
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sending", attempts: 1 })
-    .where(eq(restockAlertsTable.id, alert.id));
+    .where(eq(stockAlertsTable.id, alert.id));
 
   await run(collectingMailer(outbox), minutes(15));
 
@@ -185,9 +185,9 @@ it("a run that died after calling the mailer is sent again, and the mailer side 
 it("an alert whose third attempt was started and never closed is given up without a fourth mail", async () => {
   const alert = await ask(someone(), await bookWith(1000, 0));
   await db()
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set({ status: "sending", attempts: 3 })
-    .where(eq(restockAlertsTable.id, alert.id));
+    .where(eq(stockAlertsTable.id, alert.id));
   const outbox: Mail[] = [];
 
   await run(collectingMailer(outbox), minutes(15));
@@ -204,8 +204,8 @@ it("two runs on the same alert at once make one attempt and one mail", async () 
   const deps = makeDeps(env, { mailer: collectingMailer(outbox) });
 
   const results = await Promise.all([
-    sendRestockAlert(deps, { id: alert.id, now: minutes(15) }),
-    sendRestockAlert(deps, { id: alert.id, now: minutes(15) }),
+    sendStockAlert(deps, { id: alert.id, now: minutes(15) }),
+    sendStockAlert(deps, { id: alert.id, now: minutes(15) }),
   ]);
 
   expect(mailsOf(outbox, alert.id)).toHaveLength(1);

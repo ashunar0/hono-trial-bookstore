@@ -1,15 +1,15 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "#/db/index";
-import { restockAlertsTable } from "#/db/schema";
+import { stockAlertsTable } from "#/db/schema";
 
-export const insertAlert = (db: Db, row: typeof restockAlertsTable.$inferInsert) =>
-  db.insert(restockAlertsTable).values(row).returning();
+export const insertAlert = (db: Db, row: typeof stockAlertsTable.$inferInsert) =>
+  db.insert(stockAlertsTable).values(row).returning();
 
 /** No row back when the alert is not waiting any more (sending by the cron, or already cancelled) */
 export const deleteWaitingAlert = (db: Db, id: string) =>
   db
-    .delete(restockAlertsTable)
-    .where(and(eq(restockAlertsTable.id, id), eq(restockAlertsTable.status, "waiting")))
+    .delete(stockAlertsTable)
+    .where(and(eq(stockAlertsTable.id, id), eq(stockAlertsTable.status, "waiting")))
     .returning();
 
 /**
@@ -21,13 +21,13 @@ export const startAttempt = (
   at: { id: string; status: "waiting" | "sending"; attempts: number },
 ) =>
   db
-    .update(restockAlertsTable)
-    .set({ status: "sending", attempts: sql`${restockAlertsTable.attempts} + 1` })
+    .update(stockAlertsTable)
+    .set({ status: "sending", attempts: sql`${stockAlertsTable.attempts} + 1` })
     .where(
       and(
-        eq(restockAlertsTable.id, at.id),
-        eq(restockAlertsTable.status, at.status),
-        eq(restockAlertsTable.attempts, at.attempts),
+        eq(stockAlertsTable.id, at.id),
+        eq(stockAlertsTable.status, at.status),
+        eq(stockAlertsTable.attempts, at.attempts),
       ),
     )
     .returning();
@@ -39,7 +39,7 @@ export const finishAlert = (
   values: { status: "sent"; sentAt: Date } | { status: "failed" },
 ) =>
   db
-    .update(restockAlertsTable)
+    .update(stockAlertsTable)
     .set(values)
-    .where(and(eq(restockAlertsTable.id, id), eq(restockAlertsTable.status, "sending")))
+    .where(and(eq(stockAlertsTable.id, id), eq(stockAlertsTable.status, "sending")))
     .returning();

@@ -2,15 +2,15 @@ import { and, asc, desc, eq, inArray, lt, min, or } from "drizzle-orm";
 import type { UserId } from "hono-kit";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
-import { restockAlertsTable } from "#/db/schema";
+import { stockAlertsTable } from "#/db/schema";
 
-const open = inArray(restockAlertsTable.status, ["waiting", "sending"]);
+const open = inArray(stockAlertsTable.status, ["waiting", "sending"]);
 
 export const findAlert = async (db: Db, id: string) => {
   const [row] = await db
     .select()
-    .from(restockAlertsTable)
-    .where(eq(restockAlertsTable.id, id))
+    .from(stockAlertsTable)
+    .where(eq(stockAlertsTable.id, id))
     .limit(1);
   return row;
 };
@@ -19,13 +19,9 @@ export const findAlert = async (db: Db, id: string) => {
 export const findOpenAlert = async (db: Db, customerId: UserId, bookId: string) => {
   const [row] = await db
     .select()
-    .from(restockAlertsTable)
+    .from(stockAlertsTable)
     .where(
-      and(
-        eq(restockAlertsTable.customerId, customerId),
-        eq(restockAlertsTable.bookId, bookId),
-        open,
-      ),
+      and(eq(stockAlertsTable.customerId, customerId), eq(stockAlertsTable.bookId, bookId), open),
     )
     .limit(1);
   return row;
@@ -36,19 +32,19 @@ export const listAlerts = async (db: Db, customerId: UserId, query: PageQuery) =
   const { after, limit } = query;
   const rows = await db
     .select()
-    .from(restockAlertsTable)
+    .from(stockAlertsTable)
     .where(
       and(
-        eq(restockAlertsTable.customerId, customerId),
+        eq(stockAlertsTable.customerId, customerId),
         after === undefined
           ? undefined
           : or(
-              lt(restockAlertsTable.createdAt, after.at),
-              and(eq(restockAlertsTable.createdAt, after.at), lt(restockAlertsTable.id, after.id)),
+              lt(stockAlertsTable.createdAt, after.at),
+              and(eq(stockAlertsTable.createdAt, after.at), lt(stockAlertsTable.id, after.id)),
             ),
       ),
     )
-    .orderBy(desc(restockAlertsTable.createdAt), desc(restockAlertsTable.id))
+    .orderBy(desc(stockAlertsTable.createdAt), desc(stockAlertsTable.id))
     .limit(limit + 1);
   return toPage(rows, limit, (row) => ({ at: row.createdAt, id: row.id }));
 };
@@ -56,11 +52,11 @@ export const listAlerts = async (db: Db, customerId: UserId, query: PageQuery) =
 /** The books somebody is waiting on, the one waited on longest first */
 export const waitingBookIds = async (db: Db) => {
   const rows = await db
-    .select({ bookId: restockAlertsTable.bookId })
-    .from(restockAlertsTable)
-    .where(eq(restockAlertsTable.status, "waiting"))
-    .groupBy(restockAlertsTable.bookId)
-    .orderBy(asc(min(restockAlertsTable.createdAt)));
+    .select({ bookId: stockAlertsTable.bookId })
+    .from(stockAlertsTable)
+    .where(eq(stockAlertsTable.status, "waiting"))
+    .groupBy(stockAlertsTable.bookId)
+    .orderBy(asc(min(stockAlertsTable.createdAt)));
   return rows.map((row) => row.bookId);
 };
 
@@ -69,22 +65,19 @@ export const waitingAlertsOf = (db: Db, bookIds: string[], limit: number) =>
   bookIds.length === 0
     ? Promise.resolve([])
     : db
-        .select({ id: restockAlertsTable.id })
-        .from(restockAlertsTable)
+        .select({ id: stockAlertsTable.id })
+        .from(stockAlertsTable)
         .where(
-          and(
-            eq(restockAlertsTable.status, "waiting"),
-            inArray(restockAlertsTable.bookId, bookIds),
-          ),
+          and(eq(stockAlertsTable.status, "waiting"), inArray(stockAlertsTable.bookId, bookIds)),
         )
-        .orderBy(asc(restockAlertsTable.createdAt), asc(restockAlertsTable.id))
+        .orderBy(asc(stockAlertsTable.createdAt), asc(stockAlertsTable.id))
         .limit(limit);
 
 /** Alerts whose mail was started and not finished, oldest first. Whether they are tried again or given up is the usecase's */
 export const sendingAlerts = (db: Db, limit: number) =>
   db
-    .select({ id: restockAlertsTable.id })
-    .from(restockAlertsTable)
-    .where(eq(restockAlertsTable.status, "sending"))
-    .orderBy(asc(restockAlertsTable.createdAt), asc(restockAlertsTable.id))
+    .select({ id: stockAlertsTable.id })
+    .from(stockAlertsTable)
+    .where(eq(stockAlertsTable.status, "sending"))
+    .orderBy(asc(stockAlertsTable.createdAt), asc(stockAlertsTable.id))
     .limit(limit);

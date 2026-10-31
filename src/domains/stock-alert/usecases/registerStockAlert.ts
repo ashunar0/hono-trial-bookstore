@@ -19,7 +19,7 @@ type Input = {
  * it is (asking twice is the same ask) → 409 the book is in stock. The one-per-book rule is the unique index, so two
  * asks at once make one alert and both get it
  */
-export const registerRestockAlert = async (deps: DepsVariables["deps"], input: Input) => {
+export const registerStockAlert = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
   if ((await findBook(db, input.bookId)) === undefined) return err(NotFound.code);
 
@@ -41,8 +41,7 @@ export const registerRestockAlert = async (deps: DepsVariables["deps"], input: I
     });
     return ok(created!);
   } catch (error) {
-    if (uniqueViolationOf(error) !== "restock_alerts.customer_id, restock_alerts.book_id")
-      throw error;
+    if (uniqueViolationOf(error) !== "stock_alerts.customer_id, stock_alerts.book_id") throw error;
     // The other ask got in between our read and our write: it is the customer's alert
     const winner = await findOpenAlert(db, input.customerId, input.bookId);
     if (winner === undefined) throw error;

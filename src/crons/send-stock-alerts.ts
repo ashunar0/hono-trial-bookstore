@@ -2,11 +2,11 @@ import { createCron } from "hono-kit";
 import { stocksOf } from "#/domains/inventory/index";
 import {
   sendingAlerts,
-  sendRestockAlert,
+  sendStockAlert,
   waitingAlertsOf,
   waitingBookIds,
-} from "#/domains/restock/index";
-import { inStock } from "#/domains/restock/rules";
+} from "#/domains/stock-alert/index";
+import { inStock } from "#/domains/stock-alert/rules";
 import type { Db } from "#/db/index";
 
 /** How many alerts one run takes; the rest wait for the next run */
@@ -32,7 +32,7 @@ const waitingInStock = async (db: Db, limit: number) => {
 
 /**
  * Every 15 minutes: sends the mail of the alerts whose book is back, and tries again the ones started and not
- * finished. It writes nothing itself: sendRestockAlert does, and is safe to call again on the same alert.
+ * finished. It writes nothing itself: sendStockAlert does, and is safe to call again on the same alert.
  * The ones already being sent are read first, so a mail that fails in this run is not tried again in it: the next run
  * picks it up.
  * One that throws does not stop the rest (the next run would pick the same one first and stop there again): the run
@@ -42,7 +42,7 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
   const errors: unknown[] = [];
   const each = async (id: string) => {
     try {
-      await sendRestockAlert(deps, { id, now });
+      await sendStockAlert(deps, { id, now });
     } catch (error) {
       errors.push(error);
     }
@@ -54,5 +54,5 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
 
   if (errors.length === 1) throw errors[0];
   if (errors.length > 1)
-    throw new AggregateError(errors, `${errors.length} restock alerts failed to send`);
+    throw new AggregateError(errors, `${errors.length} stock alerts failed to send`);
 });

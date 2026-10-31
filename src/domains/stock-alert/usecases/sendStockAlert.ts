@@ -3,7 +3,7 @@ import { findBook } from "#/domains/book/index";
 import { stocksOf } from "#/domains/inventory/index";
 import { finishAlert, startAttempt } from "../mutations";
 import { findAlert } from "../queries";
-import { inStock, isOpen, maxAttempts, restockMail } from "../rules";
+import { inStock, isOpen, maxAttempts, stockAlertMail } from "../rules";
 
 type Input = { id: string; now: Date };
 
@@ -19,7 +19,7 @@ type Input = { id: string; now: Date };
  * One whose last attempt was started and never closed is given up (failed) without a fourth mail.
  * Never fails: what happened is in the returned outcome, and a mailer that does not answer is another attempt
  */
-export const sendRestockAlert = async (deps: DepsVariables["deps"], input: Input) => {
+export const sendStockAlert = async (deps: DepsVariables["deps"], input: Input) => {
   const { db, mailer } = deps;
   const alert = await findAlert(db, input.id);
   if (alert === undefined || !isOpen(alert.status)) return ok({ outcome: "skipped" as const });
@@ -41,9 +41,8 @@ export const sendRestockAlert = async (deps: DepsVariables["deps"], input: Input
   if (started === undefined) return ok({ outcome: "skipped" as const });
 
   const book = await findBook(db, alert.bookId);
-  if (book === undefined)
-    throw new Error(`restock alert ${alert.id}: book ${alert.bookId} is gone`);
-  const sent = await mailer.send({ key: alert.id, to: alert.email, ...restockMail(book.title) });
+  if (book === undefined) throw new Error(`stock alert ${alert.id}: book ${alert.bookId} is gone`);
+  const sent = await mailer.send({ key: alert.id, to: alert.email, ...stockAlertMail(book.title) });
 
   if (sent.ok) {
     await finishAlert(db, alert.id, { status: "sent", sentAt: input.now });
