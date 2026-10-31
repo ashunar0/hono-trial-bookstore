@@ -49,6 +49,22 @@ const readOr = (file, fallback) => {
   }
 };
 
+/**
+ * 表の持ち主。src/db/schema.ts の見出し（// ── expense ──）の下で export された表は、そのドメインのもの。
+ * 見出しより前の表（認証の表など）は、どのドメインのものでもない
+ */
+const ownersOf = (root) => {
+  const owners = new Map();
+  let owner = null;
+  for (const line of readOr(path.join(root, "src/db/schema.ts"), "").split("\n")) {
+    const heading = /^\/\/ ── (\S+) ──/.exec(line);
+    if (heading) owner = heading[1];
+    const table = /^export const (\w+)\s*=\s*sqliteTable\(/.exec(line);
+    if (table && owner) owners.set(table[1], owner);
+  }
+  return owners;
+};
+
 /** ドメインどうしの依存（ファイルを読んで 1 度だけ作る）。rules どうしの直接の import も数える */
 let world;
 const worldOf = (root) => {
@@ -78,7 +94,7 @@ const worldOf = (root) => {
     }
     edges.set(d, to);
   }
-  world = { edges };
+  world = { edges, owners: ownersOf(root) };
   return world;
 };
 
@@ -146,6 +162,13 @@ const violationOf = (from, fromRel, target, typeOnly, names, root) => {
     return "usecases do not write SQL: put the read in queries.ts and the write in mutations.ts, and call them";
   if (from.kind === "route" && !typeOnly && (isPkg(target, "drizzle-orm") || toDb))
     return "A route does not touch the database: read through a domain's queries, write through its usecases";
+  // 表は 1 つのドメインだけが持つ。queries と mutations が触るのは、schema.ts の自分の見出しの下の表だけ
+  if ((from.kind === "queries" || from.kind === "mutations") && target.rel === "src/db/schema.ts") {
+    const { owners } = worldOf(root);
+    const others = names.filter((n) => owners.has(n) && owners.get(n) !== fromDomain);
+    if (others.length > 0)
+      return `A table belongs to one domain: ${others.map((n) => `${n} is ${owners.get(n)}'s`).join(", ")} (its heading in src/db/schema.ts). Read it through that domain's queries, write it through its usecases`;
+  }
   if (from.kind === "index" && (target.pkg || !to || to.domain !== fromDomain))
     return "index.ts only re-exports its own domain's queries and usecases";
 
