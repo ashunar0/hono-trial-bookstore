@@ -16,9 +16,11 @@ const lineSchema = z.object({
   quantity: z.number(),
   /** This line's share of the order's discount */
   discount: z.number(),
+  /** This line's share of the points paid with */
+  points: z.number(),
 });
 
-/** A line of GET /orders. The hold, the coupon use and when they were given back stay inside */
+/** A line of GET /orders. The hold, the coupon and point uses and when they were given back stay inside */
 export const orderSummarySchema = z.object({
   id: z.string(),
   status: z.enum(orderStatuses),
@@ -30,6 +32,8 @@ export const orderSummarySchema = z.object({
   total: z.number(),
   tax: z.number(),
   couponCode: z.string().nullable(),
+  /** Paid with points, in yen: part of the payment, not a discount. The card pays total − pointsUsed */
+  pointsUsed: z.number(),
   paymentDueAt: z.string(),
   paidAt: z.string().nullable(),
   shippedAt: z.string().nullable(),
@@ -42,6 +46,8 @@ const refundSchema = z.object({
   /** null for a cancel */
   returnId: z.string().nullable(),
   amount: z.number(),
+  /** The part of amount that went back as points; the card got the rest */
+  points: z.number(),
   tax: z.number(),
 });
 
@@ -64,6 +70,7 @@ export const orderSummary = (row: OrderRow): z.infer<typeof orderSummarySchema> 
   total: row.total,
   tax: row.tax,
   couponCode: row.couponCode,
+  pointsUsed: row.pointsUsed,
   paymentDueAt: row.paymentDueAt.toISOString(),
   paidAt: iso(row.paidAt),
   shippedAt: iso(row.shippedAt),
@@ -85,12 +92,14 @@ export const orderResponse = (
     unitPrice: line.unitPrice,
     quantity: line.quantity,
     discount: line.discount,
+    points: line.points,
   })),
   returns,
   refunds: refunds.map((refund) => ({
     id: refund.id,
     returnId: refund.returnId,
     amount: refund.amount,
+    points: refund.pointsAmount,
     tax: refund.tax,
   })),
 });

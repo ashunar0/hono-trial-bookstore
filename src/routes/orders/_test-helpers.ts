@@ -16,6 +16,7 @@ export type Order = {
   total: number;
   tax: number;
   couponCode: string | null;
+  pointsUsed: number;
   paymentDueAt: string;
   paidAt: string | null;
   shippedAt: string | null;
@@ -27,8 +28,9 @@ export type Order = {
     unitPrice: number;
     quantity: number;
     discount: number;
+    points: number;
   }[];
-  refunds: { returnId: string | null; amount: number; tax: number }[];
+  refunds: { returnId: string | null; amount: number; points: number; tax: number }[];
 };
 
 /** A book with this much stock */

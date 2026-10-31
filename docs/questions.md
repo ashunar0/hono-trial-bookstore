@@ -33,3 +33,8 @@
 - QUESTION: 貯める元の「返品で返したお金の合計」は、返金のうち返品のもの（`return_id` がある行）の `amount`（ポイントで戻した分も含む）にした。ポイントで払った分にも貯まる、という設計書の文と同じ向き。
 - QUESTION: 締めと返品の申請が同時に来たときの「どちらか一方が 409」は、`updateOrder` の version で成り立つが、読んだあと書く前に割り込ませるテストは書けなかった（db を差し替えるやり方が、`updateWithVersion` の中の呼び方に依る）。version が 1 進むことだけテストにした。
 - QUESTION: 貯める cron の置き場所。別のファイルにせず、`src/crons/sweep-orders.ts` に足した（式が同じ 15 分ごとで、設計書の cron タブも 1 つの cron として書いている）。
+
+## API（段 7）
+
+- QUESTION: 注文のレスポンスの列は、設計書の例（`pointsUsed`、行の `points`、返金の `points`）に合わせた。返金の `points` は DB の `points_amount`（ポイントで戻した分）。カードに戻した分は返さない（`amount − points`）。送料に割り振ったポイント（`shippingPoints`）は中の都合として返さない。
+- QUESTION: `GET /points` と `GET /points/entries` は `requireRole("customer")`（店の人は 403）。権限の表で店の人の欄が空なので。
