@@ -2,4 +2,5 @@
 export * from "./queries";
 export * from "./usecases/cancelStockAlert";
 export * from "./usecases/registerStockAlert";
+export * from "./usecases/pickDueStockAlerts";
 export * from "./usecases/sendStockAlert";
