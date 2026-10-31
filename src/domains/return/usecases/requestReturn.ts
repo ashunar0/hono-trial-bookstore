@@ -1,6 +1,6 @@
 import { ok, type DepsVariables, type UserId } from "hono-kit";
-import { insertReturn } from "../mutations";
-import { advanceWindow } from "./_advanceWindow";
+import { insertReturnIfWon, updateWindow } from "../mutations";
+import { windowMovedNow } from "./_advanceWindow";
 import { checkRequest } from "./_checkRequest";
 
 type Input = {
@@ -14,8 +14,9 @@ type Input = {
  * The customer asks to send books of a shipped order back. Nothing is refunded until staff receive them.
  * The checks are _checkRequest's (returns and exchanges count against the same copies; rejected returns and
  * exchanges do not).
- * The order's return window moves first, and only the one that moved it writes its return: of two requests at once one
- * loses (409) instead of both counting the same copies, and the loser writes nothing it would have to take back
+ * The order's return window moves from the version read before the copies were counted, and the return is written in
+ * the same batch only where the move was this request's: of two requests at once one loses (409) and writes nothing.
+ * There is no moment when the window has moved and the return is not written yet, for another request to count in
  */
 export const requestReturn = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
@@ -30,21 +31,16 @@ export const requestReturn = async (deps: DepsVariables["deps"], input: Input) =
     requestedAt: input.now,
     version: 1,
   };
-  const moved = await advanceWindow(deps, {
-    orderId: order.id,
-    version: windowVersion,
-    now: input.now,
-  });
-  // Another request (or a change) got in after the read
-  if (!moved.ok) return moved;
-  // If this stops here, only the window moved: the customer asks again
-  await db.batch(
-    insertReturn(
+  const [moved] = await db.batch([
+    updateWindow(
       db,
-      row,
-      input.lines.map((line) => ({ returnId: row.id, ...line })),
+      { orderId: order.id, version: windowVersion },
+      { lastRequestId: row.id, updatedAt: input.now },
     ),
-  );
+    ...insertReturnIfWon(db, row, input.lines),
+  ]);
+  // Another request (or the close) got in after the read: nothing of this one was written
+  if (moved.length === 0) return windowMovedNow(db, order.id);
 
   return ok({
     ...row,

@@ -1,9 +1,10 @@
 import { eq } from "drizzle-orm";
 import { userId } from "hono-kit";
 import { expect, it } from "vitest";
-import { refundsTable, returnsTable } from "#/db/schema";
+import { refundsTable, returnLinesTable, returnsTable, returnWindowsTable } from "#/db/schema";
 import { receiveReturn, requestReturn } from "#/domains/return/index";
 import { makeDeps } from "#/main";
+import { insertReturnIfWon, updateWindow } from "../mutations";
 import { env } from "cloudflare:workers";
 import { db, request, someone } from "../../../../test/fixtures";
 import { bookWith, inNovember, put, shippedOrder } from "../../../routes/orders/_test-helpers";
@@ -66,4 +67,31 @@ it("two requests for the same copies at once: the one that loses writes nothing,
   expect(results.some((r) => typeof r === "object" && r.ok)).toBe(true);
   const returns = await db.select().from(returnsTable).where(eq(returnsTable.orderId, order.id));
   expect(returns).toHaveLength(1);
+});
+
+it("a request whose move of the window lost writes no return, though its rows are in the same batch as the move", async () => {
+  const me = someone();
+  await put(me, await bookWith(1000, 5), 1);
+  const order = await shippedOrder(me);
+  const [window] = await db()
+    .select()
+    .from(returnWindowsTable)
+    .where(eq(returnWindowsTable.orderId, order.id));
+  const stale = window!.version - 1;
+  const row = { id: crypto.randomUUID(), orderId: order.id, requestedAt: inNovember };
+
+  const [moved] = await db().batch([
+    updateWindow(
+      db(),
+      { orderId: order.id, version: stale },
+      { lastRequestId: row.id, updatedAt: inNovember },
+    ),
+    ...insertReturnIfWon(db(), row, [{ orderLineId: order.lines[0]!.id, quantity: 1 }]),
+  ]);
+
+  expect(moved).toHaveLength(0);
+  expect(await db().select().from(returnsTable).where(eq(returnsTable.id, row.id))).toHaveLength(0);
+  expect(
+    await db().select().from(returnLinesTable).where(eq(returnLinesTable.returnId, row.id)),
+  ).toHaveLength(0);
 });

@@ -1,7 +1,7 @@
 import { ok, type DepsVariables, type UserId } from "hono-kit";
-import { insertExchange } from "../mutations";
+import { insertExchangeIfWon, updateWindow } from "../mutations";
 import type { exchangeReasons } from "../rules";
-import { advanceWindow } from "./_advanceWindow";
+import { windowMovedNow } from "./_advanceWindow";
 import { checkRequest } from "./_checkRequest";
 
 type Input = {
@@ -32,20 +32,16 @@ export const requestExchange = async (deps: DepsVariables["deps"], input: Input)
     requestedAt: input.now,
     version: 1,
   };
-  const moved = await advanceWindow(deps, {
-    orderId: order.id,
-    version: windowVersion,
-    now: input.now,
-  });
-  if (!moved.ok) return moved;
-  // If this stops here, only the window moved: the customer asks again
-  await db.batch(
-    insertExchange(
+  // As a return: the move and the rows in one batch, the rows only where the move was this request's
+  const [moved] = await db.batch([
+    updateWindow(
       db,
-      row,
-      input.lines.map((line) => ({ exchangeId: row.id, ...line })),
+      { orderId: order.id, version: windowVersion },
+      { lastRequestId: row.id, updatedAt: input.now },
     ),
-  );
+    ...insertExchangeIfWon(db, row, input.lines),
+  ]);
+  if (moved.length === 0) return windowMovedNow(db, order.id);
 
   return ok({
     ...row,

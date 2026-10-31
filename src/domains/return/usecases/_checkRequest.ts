@@ -2,6 +2,7 @@ import { err, NotFound, ok, type DepsVariables, type UserId } from "hono-kit";
 import { findOrderFor, linesOf } from "#/domains/order/index";
 import { OrderStatusConflict } from "#/domains/order/rules";
 import { copiesIn, findWindow } from "../queries";
+import { openWindowLate } from "./_advanceWindow";
 import {
   returnableOf,
   returnDeadlineOf,
@@ -33,7 +34,11 @@ export const checkRequest = async (deps: DepsVariables["deps"], input: Input) =>
     return err({ code: OrderStatusConflict.code, details: { status: order.status } });
   if (input.now > returnDeadlineOf(order.shippedAt)) return err(ReturnPeriodEnded.code);
 
-  const window = await findWindow(db, order.id);
+  // A ship that stopped before opening the window: open it now, so the version read below is a real one
+  const window =
+    (await findWindow(db, order.id)) ??
+    (await openWindowLate(db, order.id, { updatedAt: input.now }))[0] ??
+    (await findWindow(db, order.id));
   const counted = await copiesIn(db, order.id, {
     returns: ["requested", "completed"],
     exchanges: ["requested", "received", "refunded"],

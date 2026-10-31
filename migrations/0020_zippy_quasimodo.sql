@@ -1,0 +1,1 @@
+ALTER TABLE `return_windows` ADD `last_request_id` text;

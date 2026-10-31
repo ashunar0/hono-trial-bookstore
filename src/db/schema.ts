@@ -413,6 +413,11 @@ export const returnWindowsTable = sqliteTable(
     shippedAt: integer("shipped_at", { mode: "timestamp_ms" }).notNull(),
     /** Copied from the order: null for one that earns nothing, never closed */
     earnId: text("earn_id"),
+    /**
+     * The request (return or exchange) that last moved the window. Its rows are written in the same batch as the move,
+     * only where this is theirs: a request that lost the move writes nothing
+     */
+    lastRequestId: text("last_request_id"),
     /** When the points to earn were closed: the return period is over and nothing is waiting. Set once */
     pointsClosedAt: integer("points_closed_at", { mode: "timestamp_ms" }),
     /** When the points were earned after closing. Null on a closed window: the cron finishes it */
