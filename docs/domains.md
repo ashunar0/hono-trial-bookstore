@@ -38,8 +38,8 @@ When several endpoints of a resource return the same shape and making it takes m
 
 ## Between domains
 
-1. **Outside a domain, two of its files are read: `index.ts` and `rules.ts`**: `#/domains/budget/index` and `#/domains/budget/rules`, never `#/domains/budget/queries`. A domain's own files import each other directly, never their own `index.ts`
-2. **`index.ts` publishes queries and usecases only** (one line each). Never rules (they are read directly), never mutations, never `usecases/_*`
+1. **Outside a domain, two of its files are read: `index.ts` and `rules.ts`** (`#/domains/budget/index`, never `#/domains/budget/queries`). A domain's own files import each other directly, never their own `index.ts`
+2. **`index.ts` publishes queries and usecases only**, one line each
 3. **To change another domain's data, call that domain's usecase.** A usecase may call another domain's usecase through its `index.ts`
 4. **A table belongs to one domain.** Only that domain's queries and mutations touch it. Another domain reads it through the owner's queries. `src/db/schema.ts` puts each domain's tables under a heading of their own (`// ── expense ──`), so the owner shows, and the lint stops a domain's queries or mutations importing a table under another heading. A value of another domain is copied into your own table only to keep it as it was at that time (an order line keeps the title and the price), or when it never changes and reading it from the owner would go through the owner's rows every time (a return window keeps when its order was shipped)
 5. **Domains do not depend on each other in a circle.** Not expense → budget and budget → expense. A circle means something sits in the wrong domain. Fix it in this order:
@@ -49,23 +49,9 @@ When several endpoints of a resource return the same shape and making it takes m
 
    Once fixed, the later one reads the earlier one (a return reads its order), never the other way
 
-### Why rules.ts is read directly
+`rules.ts` imports nothing but zod, so anyone may read it. `index.ts` publishes queries, so a file below them (`rules.ts`, `src/db/**`) that read an `index.ts` would import its way round (`src/db/schema.ts` → `coupon/index` → `coupon/queries` → `src/db/schema.ts`).
 
-The layers run one way, each reading only those to its left:
-
-```
-src/lib ← rules ← src/db ← queries / mutations ← usecases ← routes
-```
-
-`index.ts` publishes queries, so whatever sits below queries (`rules.ts`, `src/db/**`) and reads it pulls in a layer above itself, and the imports go round (`src/db/schema.ts` → `coupon/index` → `coupon/queries` → `src/db/schema.ts`). `rules.ts` is the bottom of a domain and imports nothing but zod, so it can be read from anywhere without that. What `index.ts` keeps in is the mutations. `src/lib/` is below every domain: anything may read it, and it reads no domain
-
-### Steps to place something
-
-1. What does the code import? → the kind of file inside the domain
-2. Who owns the table? → which domain. A value that is no table's (the categories) goes where everyone who needs it can read it one way
-3. What does it touch in another domain? → only its `rules.ts` and what its `index.ts` shows. If it is not there, add a rule, a query or a usecase to the owner
-
-A case these steps do not settle is a hole in the rules: stop and ask.
+A case this page does not settle is a hole in the rules: stop and ask.
 
 ## What each file may import
 
@@ -85,22 +71,15 @@ A shape two resources return (a loan from `POST /books/[id]/borrow` and from `GE
 ## Writing
 
 - **What must be written together lives in one domain.** When two rows must never be written one without the other, their tables belong to the same domain: the domain of the usecase that writes them. A carry-over of a budget is written when a month is closed, so it is the month's, and budget reads it through month's queries
-- To write them together, the usecase puts the mutations in one `db.batch([...])` (D1; `db.transaction` on pg). It makes them all happen or none. It does not stop another request coming in between a read and the write: that is the version's job
+- To write them together, the usecase puts the mutations in one `db.batch([...])` (D1; `db.transaction` on pg)
 - Every write goes through a usecase, even one with nothing to check (`setBudget`): otherwise "is there a check?" is a choice made each time, and adding one later moves the code
 - `mutations.ts` returns the query, not yet run. The usecase awaits it and reads the result: no row back from an update means it found nothing or lost to another edit
-- Forgetting the `await` would run nothing, silently: `typescript/no-floating-promises` with `checkThenables: true` (`oxlint --type-aware`) stops it
-- Edits that must not overwrite another's use `updateWithVersion` from `hono-kit/sqlite` in `mutations.ts`
-- Check order in a usecase follows hono-kit's rules.md: NOT_FOUND → ... → conflict
 
 ## Writing across domains
 
-A usecase that changes several domains holds the steps and calls each domain's usecase in turn (cancelling an order: order → inventory → coupon). The routes and the cron call that one usecase. On D1 the steps cannot be one transaction, so a failure halfway must not break anything:
+A usecase that changes several domains holds the steps and calls each domain's usecase in turn (cancelling an order: order → inventory → coupon). The routes and the cron call that one usecase. On D1 the steps cannot be one transaction: how to keep a failure halfway from breaking anything is in the design-knowledge skill (a write in steps, a thing whose state moves).
 
-- **Every step can run twice with the same result.** Giving back stock acts only while the hold is still `reserved` (`UPDATE ... WHERE id = ? AND status = 'reserved'`); a record keyed by the request's id stops a second run
-- **The state that decides the outcome is switched at the point of no return**, with the version: that switch is where one request wins and another loses. **An operation that takes (placing an order) switches it last**: hold everything first, then win. **An operation that lets go (cancelling) switches it first**: win first, then let go. Placing an order promises nothing until the switch. A cancel that switched last could give back stock while a payment came in at the same time: paid, with its stock gone
-- **A step that died halfway is finished by running it again.** The state shows how far it got, and the cron that already runs (an expired payment, say) calls the usecase again
-- On pg, pass `{ ...deps, db: tx }` to each usecase and the whole run becomes one transaction. That is why usecases take the db from deps instead of importing it
-- Events between domains are not used while the domains share one database: they are harder to follow than a call. Something that may happen later on its own (a mail) can go through a Queue when it comes up
+Events between domains are not used while the domains share one database: they are harder to follow than a call. Something that may happen later on its own (a mail) can go through a Queue when it comes up.
 
 ## An entry point that works through many (cron, queue)
 
@@ -108,4 +87,4 @@ A usecase that changes several domains holds the steps and calls each domain's u
 - The one that picks writes nothing: it decides what to work on and returns it. When one domain's queries are enough to pick, a query does it
 - The entry point holds only the loop and "one failure does not stop the rest"
 - The two are not put together into one usecase: a usecase does not call another usecase of its own domain
-- **The usecase for one does not trust what was decided when it was picked.** It reads the state again and switches it only while it is as read (a conditional update): that is where one run wins and another loses. Two runs of the cron at once, or a customer cancelling in between, then do nothing twice
+- The usecase for one does not trust what was decided when it was picked: it switches the state with a conditional update (design-knowledge: a thing whose state moves)
