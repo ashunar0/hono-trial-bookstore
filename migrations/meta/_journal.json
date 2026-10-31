@@ -127,6 +127,13 @@
       "when": 1793416941108,
       "tag": "0017_illegal_marten_broadcloak",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1793417058243,
+      "tag": "0018_soft_thunderbolts",
+      "breakpoints": true
     }
   ]
 }

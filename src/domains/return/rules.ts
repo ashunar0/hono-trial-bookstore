@@ -64,6 +64,16 @@ export const pointsRefundOf = (
   returning: number,
 ) => shareOf(line.points, line.quantity, before, returning);
 
+/** The hold on the copies sent in place of an exchange's, fixed by the exchange: asked twice, it holds once */
+export const reservationIdOfExchange = (exchangeId: string) => `exchange-${exchangeId}`;
+
+export const ExchangeStatusConflict = {
+  code: "EXCHANGE_STATUS_CONFLICT",
+  kind: "conflict",
+  message: "The exchange is not in a state that allows this (or it changed after it was read)",
+  details: z.object({ status: z.enum(exchangeStatuses) }),
+} as const;
+
 export const ReturnPeriodEnded = {
   code: "RETURN_PERIOD_ENDED",
   kind: "unprocessable",

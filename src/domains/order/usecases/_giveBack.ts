@@ -30,6 +30,7 @@ export const giveBack = async (deps: DepsVariables["deps"], order: Cancelled, no
       id: refundIdOf({ orderId: order.id }),
       orderId: order.id,
       returnId: null,
+      exchangeId: null,
       amount: order.total,
       // The points go back as points, the rest to the card
       pointsAmount: order.pointsUsed,

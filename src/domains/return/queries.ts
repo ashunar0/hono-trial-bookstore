@@ -109,22 +109,39 @@ export const returnsToSweep = (db: Db, limit: number) =>
     .orderBy(asc(returnsTable.completedAt))
     .limit(limit);
 
-/** Of these orders, the ones with a return not settled: waiting, or completed with its refund and stock not all back */
-export const orderIdsWithUnsettledReturn = async (db: Db, orderIds: string[]) => {
+/**
+ * Of these orders, the ones with a return or an exchange not settled: waiting, or its refund and the stock or points
+ * not all back (a completed return, a refunded exchange). A received exchange is settled: its money is decided
+ */
+export const orderIdsWithUnsettled = async (db: Db, orderIds: string[]) => {
   if (orderIds.length === 0) return new Set<string>();
-  const rows = await db
-    .selectDistinct({ orderId: returnsTable.orderId })
-    .from(returnsTable)
-    .where(
-      and(
-        inArray(returnsTable.orderId, orderIds),
-        or(
-          eq(returnsTable.status, "requested"),
-          and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)),
+  const [returns, exchanges] = await db.batch([
+    db
+      .selectDistinct({ orderId: returnsTable.orderId })
+      .from(returnsTable)
+      .where(
+        and(
+          inArray(returnsTable.orderId, orderIds),
+          or(
+            eq(returnsTable.status, "requested"),
+            and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)),
+          ),
         ),
       ),
-    );
-  return new Set(rows.map((row) => row.orderId));
+    db
+      .selectDistinct({ orderId: exchangesTable.orderId })
+      .from(exchangesTable)
+      .where(
+        and(
+          inArray(exchangesTable.orderId, orderIds),
+          or(
+            eq(exchangesTable.status, "requested"),
+            and(eq(exchangesTable.status, "refunded"), isNull(exchangesTable.restoredAt)),
+          ),
+        ),
+      ),
+  ]);
+  return new Set([...returns, ...exchanges].map((row) => row.orderId));
 };
 
 /** The return window of an order. None yet reads as version 0 (see returnWindowsTable) */
@@ -212,3 +229,12 @@ export const listExchanges = async (
     .limit(limit + 1);
   return toPage(rows, limit, (row) => ({ at: row.requestedAt, id: row.id }));
 };
+
+/** Refunded exchanges whose points are not back yet (the cron finishes them), oldest first */
+export const exchangesToSweep = (db: Db, limit: number) =>
+  db
+    .select({ id: exchangesTable.id })
+    .from(exchangesTable)
+    .where(and(eq(exchangesTable.status, "refunded"), isNull(exchangesTable.restoredAt)))
+    .orderBy(asc(exchangesTable.receivedAt))
+    .limit(limit);

@@ -44,8 +44,10 @@ export const orderSummarySchema = z.object({
 
 const refundSchema = z.object({
   id: z.string(),
-  /** null for a cancel */
+  /** null for a cancel or an exchange */
   returnId: z.string().nullable(),
+  /** set for an exchange refunded because no copy was left to send */
+  exchangeId: z.string().nullable(),
   amount: z.number(),
   /** The part of amount that went back as points; the card got the rest */
   points: z.number(),
@@ -102,6 +104,7 @@ export const orderResponse = (
   refunds: refunds.map((refund) => ({
     id: refund.id,
     returnId: refund.returnId,
+    exchangeId: refund.exchangeId,
     amount: refund.amount,
     points: refund.pointsAmount,
     tax: refund.tax,

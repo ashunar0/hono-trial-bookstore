@@ -289,8 +289,10 @@ export const refundsTable = sqliteTable("refunds", {
   orderId: text("order_id")
     .notNull()
     .references(() => ordersTable.id),
-  /** Null for a cancel. One refund per return */
+  /** Null for a cancel or an exchange. One refund per return */
   returnId: text("return_id").unique(),
+  /** Set for an exchange refunded because no copy was left to send. One refund per exchange */
+  exchangeId: text("exchange_id").unique(),
   /** Yen, tax included */
   amount: integer("amount").notNull(),
   /** The part of amount given back as points; the rest goes back to the card */

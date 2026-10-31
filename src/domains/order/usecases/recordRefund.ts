@@ -6,7 +6,7 @@ import { refundIdOf } from "../rules";
 type Input = {
   orderId: string;
   /** What is refunded: the id of the refund is fixed by it, so recording twice adds nothing */
-  of: { returnId: string };
+  of: { returnId: string } | { exchangeId: string };
   /** Yen, tax included */
   amount: number;
   /** The part of amount given back as points; the rest goes back to the card */
@@ -15,7 +15,7 @@ type Input = {
 };
 
 /**
- * Records money given back for something other than a cancel (a return). Refunds are order's, as the payment is:
+ * Records money given back for something other than a cancel (a return, an exchange with no copy left). Refunds are order's, as the payment is:
  * return decides how much, and order writes it down. The tax is taken once on the whole amount, as for an order.
  * Safe to run again with the same `of`
  */
@@ -23,7 +23,8 @@ export const recordRefund = async (deps: DepsVariables["deps"], input: Input) =>
   await insertRefund(deps.db, {
     id: refundIdOf(input.of),
     orderId: input.orderId,
-    returnId: input.of.returnId,
+    returnId: "returnId" in input.of ? input.of.returnId : null,
+    exchangeId: "exchangeId" in input.of ? input.of.exchangeId : null,
     amount: input.amount,
     pointsAmount: input.points,
     tax: taxWithin(input.amount),

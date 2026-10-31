@@ -102,6 +102,12 @@ export const shareOf = (total: number, quantity: number, before: number, returni
   return amount;
 };
 
-/** A refund's id, fixed by what it gives back: one per cancelled order, one per return */
-export const refundIdOf = (of: { orderId: string } | { returnId: string }) =>
-  "orderId" in of ? `refund-order-${of.orderId}` : `refund-return-${of.returnId}`;
+/** A refund's id, fixed by what it gives back: one per cancelled order, one per return, one per exchange */
+export const refundIdOf = (
+  of: { orderId: string } | { returnId: string } | { exchangeId: string },
+) =>
+  "orderId" in of
+    ? `refund-order-${of.orderId}`
+    : "returnId" in of
+      ? `refund-return-${of.returnId}`
+      : `refund-exchange-${of.exchangeId}`;

@@ -16,6 +16,9 @@ export const restoreIdOfUse = (useId: string) => `restore-${useId}`;
 /** The id of the entry that gives back the points of one return, fixed by the return */
 export const restoreIdOfReturn = (returnId: string) => `restore-return-${returnId}`;
 
+/** The same for the points of one exchange that ended in a refund, fixed by the exchange */
+export const restoreIdOfExchange = (exchangeId: string) => `restore-exchange-${exchangeId}`;
+
 export const PointsInsufficient = {
   code: "POINTS_INSUFFICIENT",
   kind: "conflict",

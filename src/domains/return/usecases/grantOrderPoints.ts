@@ -3,15 +3,16 @@ import { findOrder, refundsOf } from "#/domains/order/index";
 import { OrderStatusConflict } from "#/domains/order/rules";
 import { earnPoints } from "#/domains/point/index";
 import { markPointsEarned } from "../mutations";
-import { findWindow, returnsOf } from "../queries";
+import { exchangesOf, findWindow, returnsOf } from "../queries";
 import { earnBaseOf, returnDeadlineOf } from "../rules";
 import { advanceWindow } from "./_advanceWindow";
 
 type Input = { id: string; now: Date };
 
-/** Waiting, or completed with its refund, stock and points not all back yet */
+/** Waiting, or completed (a return) or refunded (an exchange) with its refund, stock and points not all back yet */
 const unsettled = (row: { status: string; restoredAt: Date | null }) =>
-  row.status === "requested" || (row.status === "completed" && row.restoredAt === null);
+  row.status === "requested" ||
+  ((row.status === "completed" || row.status === "refunded") && row.restoredAt === null);
 
 /**
  * The customer earns points on a shipped order once its return period is over. Called by the cron only.
@@ -39,6 +40,10 @@ export const grantOrderPoints = async (deps: DepsVariables["deps"], input: Input
     // A return being received counts too: completed before its refund is written, it would earn on the books
     const returns = await returnsOf(db, order.id);
     if (returns.some(unsettled)) return ok({ earned: null });
+    // An exchange waiting counts, and one refunded before its refund is written; a received one does not: its money is
+    // decided, and it is only waiting to be sent
+    const exchanges = await exchangesOf(db, order.id);
+    if (exchanges.some(unsettled)) return ok({ earned: null });
 
     const closed = await advanceWindow(deps, {
       orderId: order.id,
@@ -54,7 +59,9 @@ export const grantOrderPoints = async (deps: DepsVariables["deps"], input: Input
   const refunds = await refundsOf(db, order.id);
   const base = earnBaseOf(
     order,
-    refunds.filter((refund) => refund.returnId !== null).map((refund) => refund.amount),
+    refunds
+      .filter((refund) => refund.returnId !== null || refund.exchangeId !== null)
+      .map((refund) => refund.amount),
   );
   const earned = await earnPoints(deps, {
     earnId: order.earnId,

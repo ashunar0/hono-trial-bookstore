@@ -56,3 +56,17 @@ export const insertExchange = (
   row: typeof exchangesTable.$inferInsert,
   lines: (typeof exchangeLinesTable.$inferInsert)[],
 ) => [db.insert(exchangesTable).values(row), db.insert(exchangeLinesTable).values(lines)] as const;
+
+/** No row back when the version is no longer the one read */
+export const updateExchange = (
+  db: Db,
+  at: { id: string; version: number },
+  values: Partial<Omit<typeof exchangesTable.$inferInsert, "id" | "version">>,
+) => updateWithVersion(db, exchangesTable, at, values);
+
+/** Records that a refunded exchange's points are back. Not a change anyone sees, so the version stays */
+export const markExchangeRestored = (db: Db, id: string, at: Date) =>
+  db
+    .update(exchangesTable)
+    .set({ restoredAt: at })
+    .where(and(eq(exchangesTable.id, id), isNull(exchangesTable.restoredAt)));
