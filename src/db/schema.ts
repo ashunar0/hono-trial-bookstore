@@ -367,7 +367,10 @@ export const exchangesTable = sqliteTable(
     receivedAt: integer("received_at", { mode: "timestamp_ms" }),
     shippedAt: integer("shipped_at", { mode: "timestamp_ms" }),
     rejectedAt: integer("rejected_at", { mode: "timestamp_ms" }),
-    /** When the points were put back after refunding. Null on a refunded exchange: the cron finishes it */
+    /**
+     * When all it gives back is back: the hold and the points of a refunded one, the hold of a rejected one. Null on
+     * a refunded or rejected exchange: the cron finishes it
+     */
     restoredAt: integer("restored_at", { mode: "timestamp_ms" }),
     version: integer("version").notNull(),
   },

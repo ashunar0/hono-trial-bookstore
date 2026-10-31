@@ -20,6 +20,7 @@ export const POST = createEndpoint(
     const result = await rejectExchange(c.var.deps, {
       exchangeId: c.req.valid("param").id,
       reason: c.req.valid("json").reason,
+      by: "staff",
       now: c.get("now"),
     });
     if (!result.ok) return reply.failure(result.error);

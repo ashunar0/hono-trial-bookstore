@@ -104,6 +104,32 @@ it("a receive that held the last copy and stopped before switching is received w
   ).toHaveLength(0);
 });
 
+it("a reject that stopped before giving the hold back is finished by the cron, and the copy goes back on sale", async () => {
+  const me = someone();
+  const book = await bookWith(1000, 2);
+  await put(me, book, 1);
+  const order = await shippedOrder(me);
+  const asked = await ask(me, order);
+  // A receive held the copy and stopped; then a reject switched and stopped before giving it back
+  await reserveStock(makeDeps(env), {
+    reservationId: reservationIdOfExchange(asked.id),
+    lines: [{ bookId: book, quantity: 1 }],
+    now: inNovember,
+  });
+  await db()
+    .update(exchangesTable)
+    .set({ status: "rejected", rejectReason: "not damaged", rejectedAt: inNovember })
+    .where(eq(exchangesTable.id, asked.id));
+  expect(await stockOf(book)).toBe(0);
+
+  await sweep(later(1));
+  await sweep(later(16));
+
+  expect(await stockOf(book)).toBe(1);
+  const [row] = await db().select().from(exchangesTable).where(eq(exchangesTable.id, asked.id));
+  expect(row).toMatchObject({ status: "rejected", restoredAt: later(1) });
+});
+
 it("a refunded exchange whose points were not recorded as back is finished by the cron, once", async () => {
   const me = someone();
   const book = await bookWith(1600, 5);

@@ -5,6 +5,7 @@ import {
   grantOrderPoints,
   pickOrdersToGrant,
   receiveExchange,
+  rejectExchange,
   receiveReturn,
   returnsToSweep,
 } from "#/domains/return/index";
@@ -36,7 +37,11 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
     await each(() => receiveReturn(deps, { returnId: found.id, by: "cron", now }));
   }
   for (const found of await exchangesToSweep(deps.db, perRun)) {
-    await each(() => receiveExchange(deps, { exchangeId: found.id, by: "cron", now }));
+    await each(() =>
+      found.status === "rejected"
+        ? rejectExchange(deps, { exchangeId: found.id, by: "cron", now })
+        : receiveExchange(deps, { exchangeId: found.id, by: "cron", now }),
+    );
   }
   for (const order of await pickOrdersToGrant(deps, { now, limit: perRun })) {
     // One that lost to a return asked at the last moment is left: the next run finds it again if it still stands

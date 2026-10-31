@@ -230,11 +230,19 @@ export const listExchanges = async (
   return toPage(rows, limit, (row) => ({ at: row.requestedAt, id: row.id }));
 };
 
-/** Refunded exchanges whose points are not back yet (the cron finishes them), oldest first */
+/**
+ * Exchanges that stopped before giving everything back (the cron finishes them), oldest first: refunded ones whose
+ * hold and points are not back, rejected ones whose hold is not back
+ */
 export const exchangesToSweep = (db: Db, limit: number) =>
   db
-    .select({ id: exchangesTable.id })
+    .select({ id: exchangesTable.id, status: exchangesTable.status })
     .from(exchangesTable)
-    .where(and(eq(exchangesTable.status, "refunded"), isNull(exchangesTable.restoredAt)))
-    .orderBy(asc(exchangesTable.receivedAt))
+    .where(
+      and(
+        inArray(exchangesTable.status, ["refunded", "rejected"]),
+        isNull(exchangesTable.restoredAt),
+      ),
+    )
+    .orderBy(asc(exchangesTable.requestedAt), asc(exchangesTable.id))
     .limit(limit);
