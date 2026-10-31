@@ -13,8 +13,9 @@ import {
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { couponKinds } from "#/domains/coupon/rules";
-import { orderStatuses, returnStatuses } from "#/domains/order/rules";
+import { orderStatuses } from "#/domains/order/rules";
 import { pointKinds } from "#/domains/point/rules";
+import { returnStatuses } from "#/domains/return/rules";
 import { maxAttempts, stockAlertStatuses } from "#/domains/stock-alert/rules";
 
 export * from "./auth-schema";
@@ -286,6 +287,25 @@ export const orderLinesTable = sqliteTable(
   ],
 );
 
+/** Money given back: a whole order on a cancel (returnId null), or the books of one return */
+export const refundsTable = sqliteTable("refunds", {
+  id: text("id").primaryKey(),
+  orderId: text("order_id")
+    .notNull()
+    .references(() => ordersTable.id),
+  /** Null for a cancel. One refund per return */
+  returnId: text("return_id").unique(),
+  /** Yen, tax included */
+  amount: integer("amount").notNull(),
+  /** The part of amount given back as points; the rest goes back to the card */
+  pointsAmount: integer("points_amount").notNull().default(0),
+  /** The tax within amount */
+  tax: integer("tax").notNull(),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+// ── return ──
+
 /** A customer asks to send books back. Staff receive it (refund, stock back) or reject it */
 export const returnsTable = sqliteTable(
   "returns",
@@ -326,23 +346,6 @@ export const returnLinesTable = sqliteTable(
     check("return_lines_quantity_positive", sql`${t.quantity} > 0`),
   ],
 );
-
-/** Money given back: a whole order on a cancel (returnId null), or the books of one return */
-export const refundsTable = sqliteTable("refunds", {
-  id: text("id").primaryKey(),
-  orderId: text("order_id")
-    .notNull()
-    .references(() => ordersTable.id),
-  /** Null for a cancel. One refund per return */
-  returnId: text("return_id").unique(),
-  /** Yen, tax included */
-  amount: integer("amount").notNull(),
-  /** The part of amount given back as points; the rest goes back to the card */
-  pointsAmount: integer("points_amount").notNull().default(0),
-  /** The tax within amount */
-  tax: integer("tax").notNull(),
-  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
-});
 
 // ── stock-alert ──
 

@@ -1,35 +1,29 @@
-import {
-  and,
-  asc,
-  desc,
-  eq,
-  exists,
-  inArray,
-  isNotNull,
-  isNull,
-  lt,
-  lte,
-  ne,
-  not,
-  or,
-  sql,
-} from "drizzle-orm";
+import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, lt, lte, or } from "drizzle-orm";
 import type { UserId } from "hono-kit";
 import { toPage, type PageQuery } from "hono-kit/page";
 import type { Db } from "#/db/index";
-import {
-  orderLinesTable,
-  ordersTable,
-  refundsTable,
-  returnLinesTable,
-  returnsTable,
-} from "#/db/schema";
-import { placingTimeoutMs, returnPeriodMs, returnStatuses, visibleStatuses } from "./rules";
+import { orderLinesTable, ordersTable, refundsTable } from "#/db/schema";
+import { placingTimeoutMs, visibleStatuses } from "./rules";
 
 /** Any status, placing too: the caller decides what to show */
 export const findOrder = async (db: Db, id: string) => {
   const [row] = await db.select().from(ordersTable).where(eq(ordersTable.id, id)).limit(1);
   return row;
+};
+
+/** Who asks: a customer (their own orders), staff (every order) or the cron (placing ones too) */
+export type By = { customerId: UserId } | "staff" | "cron";
+
+/**
+ * The order as `by` may see it. A placing order is seen only by the cron.
+ * Someone else's is undefined, like one that does not exist
+ */
+export const findOrderFor = async (db: Db, id: string, by: By) => {
+  const order = await findOrder(db, id);
+  if (order === undefined) return undefined;
+  if (order.status === "placing" && by !== "cron") return undefined;
+  if (typeof by === "object" && order.customerId !== by.customerId) return undefined;
+  return order;
 };
 
 export const linesOf = (db: Db, orderId: string) =>
@@ -109,128 +103,39 @@ export const ordersToSweep = async (db: Db, now: Date, limit: number) => {
   return [...expired, ...stuck, ...unfinished];
 };
 
-export const findReturn = async (db: Db, id: string) => {
-  const [row] = await db.select().from(returnsTable).where(eq(returnsTable.id, id)).limit(1);
-  return row;
-};
-
-/** An order's returns, oldest first */
-export const returnsOf = (db: Db, orderId: string) =>
-  db
-    .select()
-    .from(returnsTable)
-    .where(eq(returnsTable.orderId, orderId))
-    .orderBy(asc(returnsTable.requestedAt), asc(returnsTable.id));
-
-export const returnLinesOf = (db: Db, returnIds: string[]) =>
-  returnIds.length === 0
-    ? Promise.resolve([])
-    : db.select().from(returnLinesTable).where(inArray(returnLinesTable.returnId, returnIds));
-
 /**
- * Copies of each of the order's lines in its returns of these statuses. `excluding` leaves one return out.
- * Lines with none are missing
+ * Shipped orders shipped before `before` that earn points and whose points are not closed yet, oldest first, `limit`
+ * of them after `after`. Whether a return is waiting is return's to say
  */
-export const returnedCopies = async (
+export const shippedOrdersToClose = (
   db: Db,
-  orderId: string,
-  statuses: (typeof returnStatuses)[number][],
-  excluding?: string,
-) => {
-  const rows = await db
-    .select({
-      orderLineId: returnLinesTable.orderLineId,
-      copies: sql<number>`sum(${returnLinesTable.quantity})`,
-    })
-    .from(returnLinesTable)
-    .innerJoin(returnsTable, eq(returnsTable.id, returnLinesTable.returnId))
+  input: { before: Date; after?: { at: Date; id: string }; limit: number },
+) =>
+  db
+    .select({ id: ordersTable.id, shippedAt: ordersTable.shippedAt })
+    .from(ordersTable)
     .where(
       and(
-        eq(returnsTable.orderId, orderId),
-        inArray(returnsTable.status, statuses),
-        excluding === undefined ? undefined : ne(returnsTable.id, excluding),
-      ),
-    )
-    .groupBy(returnLinesTable.orderLineId);
-  return new Map(rows.map((row) => [row.orderLineId, row.copies]));
-};
-
-/** Newest first. ?status=requested is what staff still have to decide */
-export const listReturns = async (
-  db: Db,
-  filter: { status?: (typeof returnStatuses)[number] },
-  query: PageQuery,
-) => {
-  const { after, limit } = query;
-  const rows = await db
-    .select()
-    .from(returnsTable)
-    .where(
-      and(
-        filter.status === undefined ? undefined : eq(returnsTable.status, filter.status),
-        after === undefined
+        eq(ordersTable.status, "shipped"),
+        isNotNull(ordersTable.earnId),
+        isNull(ordersTable.pointsClosedAt),
+        lt(ordersTable.shippedAt, input.before),
+        input.after === undefined
           ? undefined
           : or(
-              lt(returnsTable.requestedAt, after.at),
-              and(eq(returnsTable.requestedAt, after.at), lt(returnsTable.id, after.id)),
+              gt(ordersTable.shippedAt, input.after.at),
+              and(eq(ordersTable.shippedAt, input.after.at), gt(ordersTable.id, input.after.id)),
             ),
       ),
     )
-    .orderBy(desc(returnsTable.requestedAt), desc(returnsTable.id))
-    .limit(limit + 1);
-  return toPage(rows, limit, (row) => ({ at: row.requestedAt, id: row.id }));
-};
+    .orderBy(asc(ordersTable.shippedAt), asc(ordersTable.id))
+    .limit(input.limit);
 
-/** Completed returns whose stock and points were not put back yet (the cron finishes them), oldest first */
-export const returnsToSweep = (db: Db, limit: number) =>
+/** Orders whose points are closed and not earned yet (the cron finishes them), oldest first */
+export const closedOrdersToFinish = (db: Db, limit: number) =>
   db
-    .select({ id: returnsTable.id })
-    .from(returnsTable)
-    .where(and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)))
-    .orderBy(asc(returnsTable.completedAt))
+    .select({ id: ordersTable.id })
+    .from(ordersTable)
+    .where(and(isNotNull(ordersTable.pointsClosedAt), isNull(ordersTable.pointsEarnedAt)))
+    .orderBy(asc(ordersTable.pointsClosedAt))
     .limit(limit);
-
-/**
- * Shipped orders whose points the cron must work on, oldest first, at most `limit` of each: to close (the return period
- * is over, no return is waiting, not closed yet) and closed with the earning not done. Orders from before points have
- * no earn id and earn nothing
- */
-export const ordersToGrant = async (db: Db, now: Date, limit: number) => {
-  const waiting = db
-    .select({ id: returnsTable.id })
-    .from(returnsTable)
-    .where(
-      and(
-        eq(returnsTable.orderId, ordersTable.id),
-        // A return being received too: its refund may not be written yet
-        or(
-          eq(returnsTable.status, "requested"),
-          and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)),
-        ),
-      ),
-    );
-  const [toClose, toFinish] = await db.batch([
-    db
-      .select({ id: ordersTable.id })
-      .from(ordersTable)
-      .where(
-        and(
-          eq(ordersTable.status, "shipped"),
-          isNotNull(ordersTable.earnId),
-          isNull(ordersTable.pointsClosedAt),
-          // The deadline itself still takes a return, so it is not over yet
-          lt(ordersTable.shippedAt, new Date(now.getTime() - returnPeriodMs)),
-          not(exists(waiting)),
-        ),
-      )
-      .orderBy(asc(ordersTable.shippedAt))
-      .limit(limit),
-    db
-      .select({ id: ordersTable.id })
-      .from(ordersTable)
-      .where(and(isNotNull(ordersTable.pointsClosedAt), isNull(ordersTable.pointsEarnedAt)))
-      .orderBy(asc(ordersTable.pointsClosedAt))
-      .limit(limit),
-  ]);
-  return [...toClose, ...toFinish];
-};

@@ -1,11 +1,11 @@
 import { err, NotFound, ok, userId, type DepsVariables } from "hono-kit";
 import { restock } from "#/domains/inventory/index";
+import { findOrder, linesOf, recordRefund } from "#/domains/order/index";
 import { restorePoints } from "#/domains/point/index";
 import { restoreIdOfReturn } from "#/domains/point/rules";
-import { insertRefund, markReturnRestored, updateReturn } from "../mutations";
-import { findOrder, findReturn, linesOf, returnedCopies, returnLinesOf } from "../queries";
-import { taxWithin } from "#/domains/pricing/rules";
-import { pointsRefundOf, refundIdOf, refundOf, ReturnStatusConflict } from "../rules";
+import { markReturnRestored, updateReturn } from "../mutations";
+import { findReturn, returnedCopies, returnLinesOf } from "../queries";
+import { pointsRefundOf, refundOf, ReturnStatusConflict } from "../rules";
 
 type Input = {
   returnId: string;
@@ -57,15 +57,12 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
     amount += refundOf(orderLine, copies, line.quantity);
     points += pointsRefundOf(orderLine, copies, line.quantity);
   }
-  await insertRefund(db, {
-    id: refundIdOf({ returnId: found.id }),
+  await recordRefund(deps, {
     orderId: found.orderId,
-    returnId: found.id,
+    of: { returnId: found.id },
     amount,
-    pointsAmount: points,
-    // Once on the whole refund, as for an order
-    tax: taxWithin(amount),
-    createdAt: input.now,
+    points,
+    now: input.now,
   });
 
   // 3

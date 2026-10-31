@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { returnLinesTable, returnsTable } from "#/db/schema";
-import { returnStatuses } from "#/domains/order/rules";
+import { returnStatuses } from "#/domains/return/rules";
 
 type ReturnRow = typeof returnsTable.$inferSelect;
 type LineRow = typeof returnLinesTable.$inferSelect;

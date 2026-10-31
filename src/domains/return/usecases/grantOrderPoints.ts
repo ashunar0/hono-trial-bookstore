@@ -1,9 +1,14 @@
 import { err, NotFound, ok, userId, type DepsVariables } from "hono-kit";
+import {
+  closeOrderPoints,
+  findOrder,
+  markOrderPointsEarned,
+  refundsOf,
+} from "#/domains/order/index";
+import { OrderStatusConflict } from "#/domains/order/rules";
 import { earnPoints } from "#/domains/point/index";
-import { markPointsEarned, updateOrder } from "../mutations";
-import { findOrder, refundsOf, returnsOf } from "../queries";
-import { conflictNow } from "./_findFor";
-import { earnBaseOf, OrderStatusConflict, returnDeadlineOf } from "../rules";
+import { returnsOf } from "../queries";
+import { earnBaseOf, returnDeadlineOf } from "../rules";
 
 type Input = { id: string; now: Date };
 
@@ -37,13 +42,13 @@ export const grantOrderPoints = async (deps: DepsVariables["deps"], input: Input
     const returns = await returnsOf(db, order.id);
     if (returns.some(unsettled)) return ok({ earned: null });
 
-    const [closed] = await updateOrder(
-      db,
-      { id: order.id, version: order.version },
-      { pointsClosedAt: input.now, updatedAt: input.now },
-    );
-    if (closed === undefined) return conflictNow(db, order.id);
-    order = closed;
+    const closed = await closeOrderPoints(deps, {
+      id: order.id,
+      version: order.version,
+      now: input.now,
+    });
+    if (!closed.ok) return closed;
+    order = closed.value;
   }
 
   // 2. The returns completed so far are all there will be: a waiting one would have stopped the close, and a
@@ -61,7 +66,7 @@ export const grantOrderPoints = async (deps: DepsVariables["deps"], input: Input
   });
 
   // 3
-  await markPointsEarned(db, order.id, input.now);
+  await markOrderPointsEarned(deps, { id: order.id, now: input.now });
 
   return ok({ earned: earned.value.points });
 };

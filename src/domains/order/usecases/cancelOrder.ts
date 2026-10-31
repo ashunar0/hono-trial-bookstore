@@ -1,9 +1,9 @@
 import { err, NotFound, ok, type DepsVariables } from "hono-kit";
 import { updateOrder } from "../mutations";
-import { findOrder } from "../queries";
+import { findOrder, findOrderFor, type By } from "../queries";
 import { canCancel, OrderStatusConflict } from "../rules";
 import { giveBack } from "./_giveBack";
-import { conflictNow, findFor, type By } from "./_findFor";
+import { conflictNow } from "./_conflictNow";
 
 type Input = {
   id: string;
@@ -22,7 +22,7 @@ type Input = {
  */
 export const cancelOrder = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
-  const order = await findFor(db, input.id, input.by);
+  const order = await findOrderFor(db, input.id, input.by);
   if (order === undefined) return err(NotFound.code);
   // Switched to cancelled, but the giving back stopped halfway: the cron runs it again
   if (input.by === "cron" && order.status === "cancelled" && order.restoredAt === null) {

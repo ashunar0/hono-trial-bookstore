@@ -1,6 +1,6 @@
 import type { Db } from "#/db/index";
 import type { returnsTable } from "#/db/schema";
-import { returnLinesOf } from "#/domains/order/index";
+import { returnLinesOf } from "#/domains/return/index";
 import { returnResponse } from "./_response";
 
 /** One return as it is shown */

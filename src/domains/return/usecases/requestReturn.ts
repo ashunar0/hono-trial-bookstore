@@ -1,14 +1,14 @@
 import { err, NotFound, ok, type DepsVariables, type UserId } from "hono-kit";
-import { insertReturn, updateOrder } from "../mutations";
-import { linesOf, returnedCopies } from "../queries";
+import { findOrderFor, linesOf, touchOrder } from "#/domains/order/index";
+import { OrderStatusConflict } from "#/domains/order/rules";
+import { insertReturn } from "../mutations";
+import { returnedCopies } from "../queries";
 import {
-  OrderStatusConflict,
   returnableOf,
   returnDeadlineOf,
   ReturnPeriodEnded,
   ReturnQuantityExceeded,
 } from "../rules";
-import { findFor } from "./_findFor";
 
 type Input = {
   customerId: UserId;
@@ -26,7 +26,7 @@ type Input = {
  */
 export const requestReturn = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
-  const order = await findFor(db, input.orderId, { customerId: input.customerId });
+  const order = await findOrderFor(db, input.orderId, { customerId: input.customerId });
   if (order === undefined) return err(NotFound.code);
   const orderLines = new Map((await linesOf(db, order.id)).map((line) => [line.id, line]));
   if (input.lines.some((line) => !orderLines.has(line.orderLineId))) return err(NotFound.code);
@@ -52,14 +52,9 @@ export const requestReturn = async (deps: DepsVariables["deps"], input: Input) =
     requestedAt: input.now,
     version: 1,
   };
-  const [moved] = await updateOrder(
-    db,
-    { id: order.id, version: order.version },
-    { updatedAt: input.now },
-  );
+  const moved = await touchOrder(deps, { id: order.id, version: order.version, now: input.now });
   // Another request (or a change) got in after the read
-  if (moved === undefined)
-    return err({ code: OrderStatusConflict.code, details: { status: order.status } });
+  if (!moved.ok) return moved;
   // If this stops here, only the version moved: the customer asks again
   await db.batch(
     insertReturn(

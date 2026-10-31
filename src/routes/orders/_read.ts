@@ -1,6 +1,7 @@
 import type { Db } from "#/db/index";
 import type { ordersTable } from "#/db/schema";
-import { linesOf, refundsOf, returnLinesOf, returnsOf } from "#/domains/order/index";
+import { linesOf, refundsOf } from "#/domains/order/index";
+import { returnLinesOf, returnsOf } from "#/domains/return/index";
 import { returnResponse } from "#/routes/returns/_response";
 import { orderResponse } from "./_response";
 

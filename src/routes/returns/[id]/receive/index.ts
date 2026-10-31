@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createEndpoint, errorResponses, NotFound } from "hono-kit";
 import { requireRole } from "#/auth";
-import { receiveReturn } from "#/domains/order/index";
-import { ReturnStatusConflict } from "#/domains/order/rules";
+import { receiveReturn } from "#/domains/return/index";
+import { ReturnStatusConflict } from "#/domains/return/rules";
 import { readReturn } from "../../_read";
 import { returnResponseSchema } from "../../_response";
 

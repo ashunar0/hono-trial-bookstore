@@ -1,8 +1,8 @@
 import { z } from "zod";
 import { createEndpoint, pageQuerySchema, pageResponse, pageResponseSchema } from "hono-kit";
 import { requireRole } from "#/auth";
-import { listReturns, returnLinesOf } from "#/domains/order/index";
-import { returnStatuses } from "#/domains/order/rules";
+import { listReturns, returnLinesOf } from "#/domains/return/index";
+import { returnStatuses } from "#/domains/return/rules";
 import { returnResponse, returnResponseSchema } from "./_response";
 
 /** Newest first. ?status=requested is what is still waiting for staff */

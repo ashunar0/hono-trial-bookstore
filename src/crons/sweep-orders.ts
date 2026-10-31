@@ -1,12 +1,11 @@
 import { createCron } from "hono-kit";
+import { cancelOrder, ordersToSweep } from "#/domains/order/index";
 import {
-  cancelOrder,
   grantOrderPoints,
-  ordersToGrant,
-  ordersToSweep,
+  pickOrdersToGrant,
   receiveReturn,
   returnsToSweep,
-} from "#/domains/order/index";
+} from "#/domains/return/index";
 
 /** How many of each kind one run takes; the rest wait for the next run */
 const perRun = 100;
@@ -34,7 +33,7 @@ export const cron = createCron({ schedule: "*/15 * * * *" }, async ({ deps, now 
   for (const found of await returnsToSweep(deps.db, perRun)) {
     await each(() => receiveReturn(deps, { returnId: found.id, by: "cron", now }));
   }
-  for (const order of await ordersToGrant(deps.db, now, perRun)) {
+  for (const order of await pickOrdersToGrant(deps, { now, limit: perRun })) {
     // One that lost to a return asked at the last moment is left: the next run finds it again if it still stands
     await each(() => grantOrderPoints(deps, { id: order.id, now }));
   }

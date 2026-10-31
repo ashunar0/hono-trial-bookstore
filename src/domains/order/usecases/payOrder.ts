@@ -1,7 +1,8 @@
 import { err, NotFound, ok, type DepsVariables, type UserId } from "hono-kit";
 import { updateOrder } from "../mutations";
 import { amountToPay, canPay, OrderStatusConflict, PaymentDeadlinePassed } from "../rules";
-import { conflictNow, findFor } from "./_findFor";
+import { findOrderFor } from "../queries";
+import { conflictNow } from "./_conflictNow";
 
 type Input = { customerId: UserId; id: string; now: Date };
 
@@ -15,7 +16,7 @@ type Input = { customerId: UserId; id: string; now: Date };
  */
 export const payOrder = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
-  const order = await findFor(db, input.id, { customerId: input.customerId });
+  const order = await findOrderFor(db, input.id, { customerId: input.customerId });
   if (order === undefined) return err(NotFound.code);
   if (!canPay(order.status))
     return err({ code: OrderStatusConflict.code, details: { status: order.status } });

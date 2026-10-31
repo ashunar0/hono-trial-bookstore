@@ -1,12 +1,9 @@
 import { z } from "zod";
 import { createEndpoint, errorResponses, NotFound } from "hono-kit";
 import { requireRole } from "#/auth";
-import { requestReturn, returnLinesOf } from "#/domains/order/index";
-import {
-  OrderStatusConflict,
-  ReturnPeriodEnded,
-  ReturnQuantityExceeded,
-} from "#/domains/order/rules";
+import { OrderStatusConflict } from "#/domains/order/rules";
+import { requestReturn, returnLinesOf } from "#/domains/return/index";
+import { ReturnPeriodEnded, ReturnQuantityExceeded } from "#/domains/return/rules";
 import { returnResponse, returnResponseSchema } from "#/routes/returns/_response";
 
 /** The customer asks to send books of their own shipped order back: which lines, how many copies of each */
