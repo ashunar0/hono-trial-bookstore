@@ -96,3 +96,11 @@ A usecase that changes several domains holds the steps and calls each domain's u
 - **A step that died halfway is finished by running it again.** The state shows how far it got, and the cron that already runs (an expired payment, say) calls the usecase again
 - On pg, pass `{ ...deps, db: tx }` to each usecase and the whole run becomes one transaction. That is why usecases take the db from deps instead of importing it
 - Events between domains are not used while the domains share one database: they are harder to follow than a call. Something that may happen later on its own (a mail) can go through a Queue when it comes up
+
+## An entry point that works through many (cron, queue)
+
+- The entry point calls **a usecase that picks** and **a usecase for one**: the order cron picks with `ordersToSweep` and calls `cancelOrder` on each; the stock alert cron picks with `pickDueStockAlerts` and calls `sendStockAlert` on each
+- The one that picks writes nothing: it decides what to work on and returns it. When one domain's queries are enough to pick, a query does it
+- The entry point holds only the loop and "one failure does not stop the rest"
+- The two are not put together into one usecase: a usecase does not call another usecase of its own domain
+- **The usecase for one does not trust what was decided when it was picked.** It reads the state again and switches it only while it is as read (a conditional update): that is where one run wins and another loses. Two runs of the cron at once, or a customer cancelling in between, then do nothing twice
