@@ -107,14 +107,31 @@ export const refundOf = (
   line: { unitPrice: number; quantity: number; discount: number },
   before: number,
   returning: number,
-) => {
-  const share = Math.floor(line.discount / line.quantity);
-  const lastShare = line.discount - share * (line.quantity - 1);
+) => line.unitPrice * returning - shareOf(line.discount, line.quantity, before, returning);
+
+/**
+ * What `returning` copies of a line carry of an amount shared over the line (its discount, its points), when `before`
+ * copies were already given back. Each copy takes its fraction dropped, and the line's last copy takes what is left
+ */
+export const shareOf = (total: number, quantity: number, before: number, returning: number) => {
+  const share = Math.floor(total / quantity);
+  const lastShare = total - share * (quantity - 1);
   let amount = 0;
   for (let copy = before; copy < before + returning; copy++)
-    amount += line.unitPrice - (copy === line.quantity - 1 ? lastShare : share);
+    amount += copy === quantity - 1 ? lastShare : share;
   return amount;
 };
+
+/**
+ * The points that go back for `returning` copies of a line: the points shared to it, by the same split as the
+ * discount. The card gets the rest of the refund. The points shared to the shipping fee never come back, as the fee
+ * does not
+ */
+export const pointsRefundOf = (
+  line: { quantity: number; points: number },
+  before: number,
+  returning: number,
+) => shareOf(line.points, line.quantity, before, returning);
 
 /** A refund's id, fixed by what it gives back: one per cancelled order, one per return */
 export const refundIdOf = (of: { orderId: string } | { returnId: string }) =>

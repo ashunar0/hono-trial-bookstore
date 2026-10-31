@@ -74,6 +74,6 @@ export const requestReturn = async (deps: DepsVariables["deps"], input: Input) =
     rejectReason: null,
     completedAt: null,
     rejectedAt: null,
-    stockReturnedAt: null,
+    restoredAt: null,
   });
 };

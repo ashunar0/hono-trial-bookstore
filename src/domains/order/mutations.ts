@@ -58,9 +58,9 @@ export const updateReturn = (
   values: Partial<Omit<typeof returnsTable.$inferInsert, "id" | "version">>,
 ) => updateWithVersion(db, returnsTable, at, values);
 
-/** Records that a completed return's stock is back. Not a change anyone sees, so the version stays */
-export const markStockReturned = (db: Db, id: string, at: Date) =>
+/** Records that a completed return's stock and points are back. Not a change anyone sees, so the version stays */
+export const markReturnRestored = (db: Db, id: string, at: Date) =>
   db
     .update(returnsTable)
-    .set({ stockReturnedAt: at })
-    .where(and(eq(returnsTable.id, id), isNull(returnsTable.stockReturnedAt)));
+    .set({ restoredAt: at })
+    .where(and(eq(returnsTable.id, id), isNull(returnsTable.restoredAt)));

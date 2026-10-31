@@ -1,0 +1,1 @@
+ALTER TABLE `returns` RENAME COLUMN "stock_returned_at" TO "restored_at";

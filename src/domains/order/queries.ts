@@ -166,11 +166,11 @@ export const listReturns = async (
   return toPage(rows, limit, (row) => ({ at: row.requestedAt, id: row.id }));
 };
 
-/** Completed returns whose stock was not put back yet (the cron finishes them), oldest first */
+/** Completed returns whose stock and points were not put back yet (the cron finishes them), oldest first */
 export const returnsToSweep = (db: Db, limit: number) =>
   db
     .select({ id: returnsTable.id })
     .from(returnsTable)
-    .where(and(eq(returnsTable.status, "completed"), isNull(returnsTable.stockReturnedAt)))
+    .where(and(eq(returnsTable.status, "completed"), isNull(returnsTable.restoredAt)))
     .orderBy(asc(returnsTable.completedAt))
     .limit(limit);

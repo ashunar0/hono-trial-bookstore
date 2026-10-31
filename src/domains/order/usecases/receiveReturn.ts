@@ -1,21 +1,24 @@
-import { err, NotFound, ok, type DepsVariables } from "hono-kit";
+import { err, NotFound, ok, userId, type DepsVariables } from "hono-kit";
 import { restock } from "#/domains/inventory/index";
-import { insertRefund, markStockReturned, updateReturn } from "../mutations";
-import { findReturn, linesOf, returnedCopies, returnLinesOf } from "../queries";
+import { restorePoints } from "#/domains/point/index";
+import { restoreIdOfReturn } from "#/domains/point/rules";
+import { insertRefund, markReturnRestored, updateReturn } from "../mutations";
+import { findOrder, findReturn, linesOf, returnedCopies, returnLinesOf } from "../queries";
 import { taxWithin } from "#/domains/pricing/rules";
-import { refundIdOf, refundOf, ReturnStatusConflict } from "../rules";
+import { pointsRefundOf, refundIdOf, refundOf, ReturnStatusConflict } from "../rules";
 
 type Input = {
   returnId: string;
-  /** The cron finishes a return completed whose stock is not back yet */
+  /** The cron finishes a return completed whose stock and points are not back yet */
   by: "staff" | "cron";
   now: Date;
 };
 
 /**
- * Staff got the books: 1 the return completed → 2 its refund → 3 the stock back under the return's id → record it
- * is back. Only the one that won 1 goes on (a refund in the same batch as 1 would be tried even when 1 lost).
- * 2 and 3 are safe to run again, so the cron finishes a receive that stopped
+ * Staff got the books: 1 the return completed → 2 its refund, the points of those books as points and the rest for the
+ * card → 3 the stock back under the return's id → 4 the points back under the return's id → record both are back.
+ * Only the one that won 1 goes on (a refund in the same batch as 1 would be tried even when 1 lost).
+ * 2, 3 and 4 are safe to run again, so the cron finishes a receive that stopped
  */
 export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) => {
   const { db } = deps;
@@ -24,7 +27,7 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
   const lines = await returnLinesOf(db, [found.id]);
   const orderLines = new Map((await linesOf(db, found.orderId)).map((line) => [line.id, line]));
 
-  if (!(input.by === "cron" && found.status === "completed" && found.stockReturnedAt === null)) {
+  if (!(input.by === "cron" && found.status === "completed" && found.restoredAt === null)) {
     if (found.status !== "requested")
       return err({ code: ReturnStatusConflict.code, details: { status: found.status } });
 
@@ -45,17 +48,21 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
 
   // 2. Copies of each line refunded before this return: the same on a second run, which counts this one out
   const before = await returnedCopies(db, found.orderId, ["completed"], found.id);
-  const amount = lines.reduce((sum, line) => {
+  let amount = 0;
+  let points = 0;
+  for (const line of lines) {
     const orderLine = orderLines.get(line.orderLineId);
-    return orderLine === undefined
-      ? sum
-      : sum + refundOf(orderLine, before.get(line.orderLineId) ?? 0, line.quantity);
-  }, 0);
+    if (orderLine === undefined) continue;
+    const copies = before.get(line.orderLineId) ?? 0;
+    amount += refundOf(orderLine, copies, line.quantity);
+    points += pointsRefundOf(orderLine, copies, line.quantity);
+  }
   await insertRefund(db, {
     id: refundIdOf({ returnId: found.id }),
     orderId: found.orderId,
     returnId: found.id,
     amount,
+    pointsAmount: points,
     // Once on the whole refund, as for an order
     tax: taxWithin(amount),
     createdAt: input.now,
@@ -70,7 +77,17 @@ export const receiveReturn = async (deps: DepsVariables["deps"], input: Input) =
     }),
     now: input.now,
   });
-  await markStockReturned(db, found.id, input.now);
+
+  // 4
+  const order = await findOrder(db, found.orderId);
+  if (order !== undefined)
+    await restorePoints(deps, {
+      restoreId: restoreIdOfReturn(found.id),
+      customerId: userId(order.customerId),
+      points,
+      now: input.now,
+    });
+  await markReturnRestored(db, found.id, input.now);
 
   return ok((await findReturn(db, found.id)) ?? found);
 };

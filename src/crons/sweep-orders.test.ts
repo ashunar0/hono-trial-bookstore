@@ -136,7 +136,7 @@ it("puts back the stock of a return completed when the Worker died before restoc
 
   expect(await stockOf(book)).toBe(5);
   const [row] = await db().select().from(returnsTable).where(eq(returnsTable.id, asked.id));
-  expect(row?.stockReturnedAt).toEqual(expect.any(Date));
+  expect(row?.restoredAt).toEqual(expect.any(Date));
 });
 
 it("one order that fails does not stop the others, and the run still fails so it is seen", async () => {

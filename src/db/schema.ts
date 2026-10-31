@@ -295,8 +295,8 @@ export const returnsTable = sqliteTable(
     requestedAt: integer("requested_at", { mode: "timestamp_ms" }).notNull(),
     completedAt: integer("completed_at", { mode: "timestamp_ms" }),
     rejectedAt: integer("rejected_at", { mode: "timestamp_ms" }),
-    /** When the stock was put back after completing. Null on a completed return: the cron finishes it */
-    stockReturnedAt: integer("stock_returned_at", { mode: "timestamp_ms" }),
+    /** When the stock and the points were put back after completing. Null on a completed return: the cron finishes it */
+    restoredAt: integer("restored_at", { mode: "timestamp_ms" }),
     version: integer("version").notNull(),
   },
   (t) => [
