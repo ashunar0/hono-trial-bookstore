@@ -1,3 +1,7 @@
+import { requireRole } from "#/auth";
+import { listBooks, registerBook } from "#/domains/book/index";
+import { stocksOf } from "#/domains/inventory/index";
+import { noStock } from "#/domains/inventory/rules";
 import {
   allowAnonymous,
   createEndpoint,
@@ -5,10 +9,6 @@ import {
   pageResponse,
   pageResponseSchema,
 } from "hono-kit";
-import { requireRole } from "#/auth";
-import { listBooks, registerBook } from "#/domains/book/index";
-import { stocksOf } from "#/domains/inventory/index";
-import { noStock } from "#/domains/inventory/rules";
 import { bookResponse, bookResponseSchema } from "./_response";
 import { bookInputSchema } from "./_schema";
 
